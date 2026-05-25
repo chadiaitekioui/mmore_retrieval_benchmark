@@ -2,6 +2,10 @@
 data/*.jsonl
 data/ground_truth.json
 results/
+proc_demo.db
+corpus/data/
+corpus/mmore_input/
+corpus/work/
 *.log
 
 # Python

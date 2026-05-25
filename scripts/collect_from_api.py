@@ -133,7 +133,7 @@ def main():
                         args.min_similarity,
                     )
                 else:
-                    collection = row.get("collection_name", "my_docs")
+                    collection = row.get("collection_name", "my_db")
                     payload = post_rag(
                         client,
                         args.base_url,

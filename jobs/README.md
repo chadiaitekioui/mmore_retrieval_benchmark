@@ -4,6 +4,7 @@ Independent shell wrappers — see [README.md](../README.md) for order and prere
 
 | Script | Purpose |
 |--------|---------|
+| `00_build_corpus.sh` | PLOS download + MMORE process/postprocess/index → `proc_demo.db` (Run:ai / GPU) |
 | `00_prepare.sh` | Dataset → `data/*.jsonl` |
 | `01_collect.sh RUN URL` | One run → `results/RUN/chunks.json` |
 | `02_annotate.sh` | Ground truth (union A+B+C) — OpenAI, compatible API, or HF via `ANNOTATOR_MODEL` |

@@ -1,0 +1,13 @@
+# MMORE process — PLOS .txt corpus (use absolute paths via env vars)
+data_path: ${CORPUS_MMORE_INPUT}
+google_drive_ids: []
+previous_results: null
+dispatcher_config:
+  output_path: ${CORPUS_PROCESS_OUT}
+  use_fast_processors: true
+  distributed: false
+  extract_images: false
+  scheduler_file: null
+  process_batch_sizes:
+    - TXTProcessor: 100
+  processor_config: {}

@@ -1,0 +1,11 @@
+previous_results: null
+
+pp_modules:
+  - type: chunker
+    args:
+      chunking_strategy: sentence
+      table_handling: single_row
+
+output:
+  output_path: ${CORPUS_PP_OUT}
+  save_each_step: true

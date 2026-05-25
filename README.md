@@ -83,6 +83,40 @@ pip install -r requirements-hf-annotate.txt
 
 ---
 
+## Build the corpus (before the benchmark)
+
+You need a Milvus index: **`proc_demo.db`**, database **`my_db`**, collection **`my_db`** (set via env vars below).
+
+Scripts in [`corpus/`](corpus/) download PLOS articles (1k or 5k), convert to `.txt`, then run MMORE from **your fork**:
+
+```bash
+pip install -e /path/to/mmore    # branch llm-as-a-judge
+
+export MMORE_ROOT=/path/to/mmore
+export HF_HOME=/path/to/hf_cache
+bash corpus/build_index.sh 1000     # or 5000 for PLOS-5k
+```
+
+On Run:ai (GPU job + PVC):
+
+```bash
+export MMORE_ROOT=/workspace/mmore
+export HF_HOME=/workspace/hf_cache
+bash jobs/00_build_corpus.sh 1000
+```
+
+Then export for MMORE deploy and the benchmark:
+
+```bash
+export DB_URI=/path/to/proc_demo.db
+export DB_NAME=my_db
+export COLLECTION_NAME=my_db
+```
+
+Details: [corpus/README.md](corpus/README.md).
+
+---
+
 ## Step-by-step
 
 Run from the **repo root** with the venv activated (`source .venv/bin/activate`).
@@ -104,7 +138,7 @@ No MMORE, no API key, no GPU.
 
 **Needs (outside this repo):**
 
-- Milvus index (e.g. `proc_demo.db`, collection `my_docs`)
+- Milvus index (`proc_demo.db`, `DB_NAME=my_db`, `COLLECTION_NAME=my_db`)
 - MMORE from branch `llm-as-a-judge`, deployed with the YAML for each run
 - Network from the machine running collect to MMORE (see **Run:ai — two terminals** below)
 

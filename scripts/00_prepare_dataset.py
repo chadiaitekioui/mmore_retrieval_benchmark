@@ -59,7 +59,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--collection-name",
-        default="my_docs",
+        default="my_db",
         help="Milvus collection name passed to MMORE",
     )
     parser.add_argument(
