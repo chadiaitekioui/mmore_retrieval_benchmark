@@ -1,0 +1,40 @@
+# Control run: same pipeline as run_C but judge LLM calls skipped (threshold-only).
+rag:
+  llm:
+    llm_name: meta-llama/Llama-3.1-8B-Instruct
+    max_new_tokens: 1200
+  retriever:
+    db:
+      uri: ${DB_URI}
+      name: ${DB_NAME}
+    collection_name: ${COLLECTION_NAME}
+    hybrid_search_weight: 0.5
+    k: 5
+    use_web: false
+    reranker_model_name: BAAI/bge-reranker-base
+  judge:
+    llm:
+      llm_name: meta-llama/Llama-3.1-8B-Instruct
+      max_new_tokens: 512
+    skip_llm_judge: true
+    system_prompt: |
+      You are a retrieval quality judge for a medical RAG system (English only).
+    user_prompt: |
+      Question: {query}
+      Return JSON only.
+    metric_thresholds:
+      min_mean_similarity: 0.5
+      min_max_rerank_score: 1.0
+      min_mean_rerank_score: 0.5
+      min_num_docs: 3
+      min_context_relevance: 7.0
+    max_corrective_steps: 1
+    allow_add_questions: true
+    allow_add_context: true
+    allow_re_retrieve: true
+    max_web_results: 5
+  system_prompt: "Use the following context to answer the questions.\n\nContext:\n{context}"
+  mode: local
+  mode_args:
+    input_file: ${INPUT_FILE}
+    output_file: ${OUTPUT_DIR}/run_C_ctrl/chunks.json

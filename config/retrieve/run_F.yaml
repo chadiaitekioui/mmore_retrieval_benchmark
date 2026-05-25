@@ -1,0 +1,8 @@
+db:
+  uri: ${DB_URI}
+  name: ${DB_NAME}
+collection_name: ${COLLECTION_NAME}
+hybrid_search_weight: 0.5
+k: 10
+use_web: false
+reranker_model_name: BAAI/bge-reranker-base

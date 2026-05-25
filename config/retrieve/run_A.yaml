@@ -1,0 +1,9 @@
+# Retriever-only (mmore retrieve). Copy to cluster PVC with benchmark repo + DB.
+db:
+  uri: ${DB_URI}
+  name: ${DB_NAME}
+collection_name: ${COLLECTION_NAME}
+hybrid_search_weight: 0.5
+k: 5
+use_web: false
+reranker_model_name: null

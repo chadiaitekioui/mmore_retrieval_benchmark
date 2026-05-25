@@ -1,0 +1,19 @@
+rag:
+  llm:
+    llm_name: meta-llama/Llama-3.1-8B-Instruct
+    max_new_tokens: 1200
+  retriever:
+    db:
+      uri: ${DB_URI}           # ex: ./proc_demo.db
+      name: ${DB_NAME}         # ex: my_db
+    collection_name: ${COLLECTION_NAME}
+    hybrid_search_weight: 0.5
+    k: 5
+    use_web: false
+    reranker_model_name: null  # no reranker
+  # no judge
+  system_prompt: "Use the following context to answer the questions.\n\nContext:\n{context}"
+  mode: local
+  mode_args:
+    input_file: ${INPUT_FILE}
+    output_file: ${OUTPUT_DIR}/run_A/chunks.json
