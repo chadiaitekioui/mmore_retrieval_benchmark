@@ -28,14 +28,27 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def normalize_options(options) -> list[str]:
+    if isinstance(options, dict):
+        return [options[k] for k in sorted(options.keys())]
+    return list(options)
+
+
+def normalize_answer_idx(item: dict, n_options: int) -> int:
+    answer_idx = item.get("answer_idx", item.get("answer", item.get("label", 0)))
+    if isinstance(answer_idx, str):
+        if len(answer_idx) == 1 and answer_idx.isalpha():
+            return ord(answer_idx.upper()) - ord("A")
+        return int(answer_idx)
+    return int(answer_idx)
+
+
 def build_rows(sample: list[dict], collection_name: str) -> tuple[list[dict], list[dict]]:
     questions_rows = []
     mmore_rows = []
     for item in sample:
-        options = item.get("options", [])
-        answer_idx = item.get("answer_idx", item.get("answer", 0))
-        if isinstance(answer_idx, str):
-            answer_idx = ord(answer_idx.upper()) - ord("A")
+        options = normalize_options(item.get("options", []))
+        answer_idx = normalize_answer_idx(item, len(options))
         answer_text = options[answer_idx] if options else ""
         query = item["question"]
         questions_rows.append(
@@ -75,9 +88,9 @@ def main():
     except ImportError:
         raise SystemExit("pip install datasets")
 
-    print("Loading MedXpertQA…")
-    ds = load_dataset("TsinghuaC3I/MedXpertQA", split="test")
-    text_items = [x for x in ds if x.get("track", "text") == TRACK]
+    print("Loading MedXpertQA (Text config)…")
+    ds = load_dataset("TsinghuaC3I/MedXpertQA", "Text", split="test")
+    text_items = list(ds)
     print(f"  {len(text_items)} text-track questions available")
 
     random.seed(SEED)

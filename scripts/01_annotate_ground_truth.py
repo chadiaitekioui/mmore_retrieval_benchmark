@@ -51,6 +51,42 @@ Respond with a JSON array of booleans only, one per chunk, in the same order, \
 e.g. [true, false, true]. No explanation, no markdown, just the array."""
 
 
+def max_tokens_for_chunks(n_chunks: int) -> int:
+    """Enough tokens for `[false, ...]` with one bool per chunk."""
+    return max(256, n_chunks * 12 + 32)
+
+
+def parse_bool_array(raw: str, expected_len: int | None = None) -> list[bool]:
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+    start = text.find("[")
+    if start < 0:
+        raise ValueError(f"No JSON array in model output: {raw[:200]!r}")
+    end = text.rfind("]") + 1
+    if end > start:
+        try:
+            parsed = json.loads(text[start:end])
+            if isinstance(parsed, list):
+                return [bool(x) for x in parsed]
+        except json.JSONDecodeError:
+            pass
+
+    import re
+
+    tokens = re.findall(r"\b(true|false)\b", text[start:].lower())
+    if not tokens:
+        raise ValueError(f"No JSON array in model output: {raw[:200]!r}")
+    vals = [t == "true" for t in tokens]
+    if expected_len is not None:
+        if len(vals) < expected_len:
+            raise ValueError(
+                f"Truncated bool array ({len(vals)}/{expected_len}): {raw[:200]!r}"
+            )
+        vals = vals[:expected_len]
+    return vals
+
+
 def annotate_openai(client, model: str, question: str, answer: str, chunks: list[dict]) -> list[bool]:
     resp = client.chat.completions.create(
         model=model,
@@ -65,11 +101,11 @@ def annotate_openai(client, model: str, question: str, answer: str, chunks: list
                 ),
             },
         ],
-        max_tokens=128,
+        max_tokens=max_tokens_for_chunks(len(chunks)),
         temperature=0,
     )
     raw = resp.choices[0].message.content or ""
-    return parse_bool_array(raw)
+    return parse_bool_array(raw, expected_len=len(chunks))
 
 
 DEFAULT_HF_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
@@ -89,22 +125,13 @@ def use_hf_backend(model: str, backend: str | None) -> bool:
     return model in ("local", "hf") or "/" in model
 
 
-def parse_bool_array(raw: str) -> list[bool]:
-    text = raw.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-    start = text.find("[")
-    end = text.rfind("]") + 1
-    if start < 0 or end <= start:
-        raise ValueError(f"No JSON array in model output: {raw[:200]!r}")
-    return [bool(x) for x in json.loads(text[start:end])]
-
-
 def load_hf_annotator(model_id: str):
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(model_id)
+    if tokenizer.pad_token_id is None and tokenizer.eos_token_id is not None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
         device_map="auto",
@@ -121,6 +148,8 @@ def annotate_hf(
     answer: str,
     chunks: list[dict],
 ) -> list[bool]:
+    import torch
+
     user = USER_TMPL.format(
         question=question,
         answer=answer,
@@ -137,11 +166,17 @@ def annotate_hf(
     )
     inputs = tokenizer(prompt, return_tensors="pt")
     inputs = {k: v.to(model.device) for k, v in inputs.items()}
+    max_new = max_tokens_for_chunks(len(chunks))
     with torch.inference_mode():
-        out = model.generate(**inputs, max_new_tokens=128, do_sample=False)
+        out = model.generate(
+            **inputs,
+            max_new_tokens=max_new,
+            do_sample=False,
+            pad_token_id=tokenizer.pad_token_id,
+        )
     new_tokens = out[0, inputs["input_ids"].shape[1] :]
     text = tokenizer.decode(new_tokens, skip_special_tokens=True)
-    return parse_bool_array(text)
+    return parse_bool_array(text, expected_len=len(chunks))
 
 
 def main():
@@ -226,9 +261,8 @@ def main():
                     n_new_labels += 1
             except Exception as e:
                 print(f"  [!] {query[:40]}… : {e}")
-                for ch in to_annotate:
-                    labels_map[chunk_id(ch)] = False
                 errors += 1
+                # Leave chunk_ids unlabeled so --incremental can retry after a fix.
             time.sleep(args.sleep)
 
         gt_questions.append(

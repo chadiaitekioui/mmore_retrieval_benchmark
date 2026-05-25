@@ -87,33 +87,101 @@ pip install -r requirements-hf-annotate.txt
 
 You need a Milvus index: **`proc_demo.db`**, database **`my_db`**, collection **`my_db`** (set via env vars below).
 
-Scripts in [`corpus/`](corpus/) download PLOS articles (1k or 5k), convert to `.txt`, then run MMORE from **your fork**:
+On RCP Run:ai, `bash jobs/00_build_corpus.sh` (wrapper around `corpus/build_index.sh`) can fail depending on venv paths, GPU job layout, or env substitution. The **validated path** is to run **download → convert → process → postprocess → index** manually (see below). Details and config templates: [corpus/README.md](corpus/README.md).
+
+### Install MMORE (once per venv, on scratch)
+
+Use a venv on **persistent scratch** (not inside the ephemeral container root), e.g. `$MMORE_ROOT/.venv`:
 
 ```bash
-pip install -e /path/to/mmore    # branch llm-as-a-judge
+export MMORE_ROOT=/scratch/$USER/mmore          # your mmore fork (branch llm-as-a-judge)
+export BENCH=/scratch/$USER/mmore_retrieval_benchmark
+export HF_HOME=/scratch/$USER/hf_cache
 
-export MMORE_ROOT=/path/to/mmore
-export HF_HOME=/path/to/hf_cache
-bash corpus/build_index.sh 1000     # or 5000 for PLOS-5k
+cd "$MMORE_ROOT"
+python -m venv .venv && source .venv/bin/activate
+pip install -e "${MMORE_ROOT}[process,index,rag,api]"
 ```
 
-On Run:ai (GPU job + PVC):
+### Environment (export before every MMORE command)
 
 ```bash
-export MMORE_ROOT=/workspace/mmore
-export HF_HOME=/workspace/hf_cache
+export BENCH=/scratch/$USER/mmore_retrieval_benchmark
+export MMORE_ROOT=/scratch/$USER/mmore
+export HF_HOME=/scratch/$USER/hf_cache
+export DB_URI="${BENCH}/proc_demo.db"
+export DB_NAME=my_db
+export COLLECTION_NAME=my_db
+
+# Corpus pipeline paths (PLOS-1k)
+export CORPUS_MMORE_INPUT="${BENCH}/corpus/mmore_input/plos_1k"
+export CORPUS_PROCESS_OUT="${BENCH}/corpus/work/plos_1k/process"
+export CORPUS_PP_OUT="${BENCH}/corpus/work/plos_1k/postprocess/results.jsonl"
+
+source "${MMORE_ROOT}/.venv/bin/activate"
+cd "$BENCH"
+```
+
+Adjust `$USER` / paths if your PVC layout differs (haas: `/mnt/light/scratch/users/$USER/…`, Run:ai pod: `/scratch/users/$USER/…` — same storage).
+
+### Step 1 — Download PLOS articles + convert to `.txt`
+
+```bash
+pip install -r corpus/requirements.txt -q
+
+python corpus/download_plos.py --size 1000 \
+  --output corpus/data/plos_1000.json
+
+python corpus/convert_plos_to_mmore.py \
+  --input corpus/data/plos_1000.json \
+  --output-dir "$CORPUS_MMORE_INPUT"
+```
+
+Expect ~930 `.txt` files under `$CORPUS_MMORE_INPUT` (some API entries have no body).
+
+### Step 2 — MMORE process → postprocess → index (manual)
+
+Run from `$BENCH` with the env vars above:
+
+```bash
+# Process: .txt → merged JSONL
+python -m mmore process --config-file corpus/config/process_plos.yaml
+
+# Postprocess: chunking
+python -m mmore postprocess \
+  --config-file corpus/config/postprocess_plos.yaml \
+  --input-data "${CORPUS_PROCESS_OUT}/merged/merged_results.jsonl"
+
+# Index: embeddings → proc_demo.db (GPU recommended)
+python -m mmore index \
+  --config-file corpus/config/index_plos.yaml \
+  --documents-path "$CORPUS_PP_OUT" \
+  --collection-name "$COLLECTION_NAME"
+```
+
+Verify:
+
+```bash
+ls -lh "$DB_URI"
+# merged + postprocess outputs
+ls -lh "${CORPUS_PROCESS_OUT}/merged/merged_results.jsonl" "$CORPUS_PP_OUT"
+```
+
+Keep `DB_URI`, `DB_NAME`, and `COLLECTION_NAME` exported for all benchmark steps (collect + RAG/retrieve deploy).
+
+### Optional — automated wrapper
+
+If your environment matches the script assumptions, you can try:
+
+```bash
+export MMORE_ROOT=/path/to/mmore
+export HF_HOME=/path/to/hf_cache
+bash corpus/build_index.sh 1000
+# or on Run:ai:
 bash jobs/00_build_corpus.sh 1000
 ```
 
-Then export for MMORE deploy and the benchmark:
-
-```bash
-export DB_URI=/path/to/proc_demo.db
-export DB_NAME=my_db
-export COLLECTION_NAME=my_db
-```
-
-Details: [corpus/README.md](corpus/README.md).
+Use `SKIP_DOWNLOAD=1` / `SKIP_CONVERT=1` to reuse cached PLOS JSON and `.txt` trees.
 
 ---
 
@@ -125,10 +193,14 @@ Run from the **repo root** with the venv activated (`source .venv/bin/activate`)
 
 **Output:** `data/medxpertqa_200_mmore.jsonl` (+ `data/medxpertqa_200.jsonl` for answers)
 
+This step is **independent** from corpus indexing (process / postprocess / index above).
+
 ```bash
 bash jobs/00_prepare.sh
 # pilot (30 questions): bash jobs/00_prepare.sh --pilot
 ```
+
+Requires `datasets` (`pip install -r requirements.txt`). The script loads `TsinghuaC3I/MedXpertQA` with config **`Text`** and normalizes MCQ `options` / `label` fields.
 
 No MMORE, no API key, no GPU.
 
@@ -146,24 +218,6 @@ No MMORE, no API key, no GPU.
 
 **All steps in one command:** with `MMORE_URL_run_`* per deployment — see `[jobs/README.md](jobs/README.md)`.
 
-```bash
-bash jobs/run_benchmark.sh
-```
-
-For **each** run: deploy MMORE with the matching config, wait for the API, then collect.
-
-
-| Run        | Deploy config                    | Collect                                                    |
-| ---------- | -------------------------------- | ---------------------------------------------------------- |
-| run_A      | `config/retrieve/run_A.yaml`     | `bash jobs/01_collect.sh run_A http://localhost:8001`      |
-| run_B      | `config/retrieve/run_B.yaml`     | `bash jobs/01_collect.sh run_B http://localhost:8001`      |
-| run_C      | `config/rag/run_C_api.yaml`      | `bash jobs/01_collect.sh run_C http://localhost:8000`      |
-| run_C_ctrl | `config/rag/run_C_ctrl_api.yaml` | `bash jobs/01_collect.sh run_C_ctrl http://localhost:8000` |
-| run_D      | `config/retrieve/run_D.yaml`     | `bash jobs/01_collect.sh run_D http://localhost:8001`      |
-| run_E      | `config/retrieve/run_E.yaml`     | `bash jobs/01_collect.sh run_E http://localhost:8001`      |
-| run_F      | `config/retrieve/run_F.yaml`     | `bash jobs/01_collect.sh run_F http://localhost:8001`      |
-
-
 #### Run:ai, two terminals (one way to do)
 
 MMORE lives in its **own repo**; this benchmark is a **second clone** on the same PVC. You do not merge them. MMORE serves HTTP, this repo calls it.
@@ -171,7 +225,9 @@ MMORE lives in its **own repo**; this benchmark is a **second clone** on the sam
 1. Start **one GPU job** on Run:ai (both clones on the PVC, e.g. `/scratch/$USER/mmore` and `…/mmore-bench`).
 2. Open **two Terminal windows on your Computer** and connect **both to that same job** (Run:ai UI *Connect* / *Shell*, or your cluster’s `runai bash <job>` — exact command depends on your setup).
 
-**Terminal 1** (MMORE, leave running):
+**Terminal 1** (MMORE, leave running): 
+
+**⚠️ run_A, B, D, E, F with retriever and run_C and run C_ctrl with rag command**
 
 ```bash
 cd /scratch/$USER/mmore && source .venv/bin/activate
@@ -185,6 +241,18 @@ python -m mmore retrieve \
 cd /scratch/$USER/mmore-bench && source .venv/bin/activate
 bash jobs/01_collect.sh run_B http://localhost:8001
 ```
+
+
+| Run        | Deploy config                    | Collect                                                    |
+| ---------- | -------------------------------- | ---------------------------------------------------------- |
+| run_A      | `config/retrieve/run_A.yaml`     | `bash jobs/01_collect.sh run_A http://localhost:8001`      |
+| run_B      | `config/retrieve/run_B.yaml`     | `bash jobs/01_collect.sh run_B http://localhost:8001`      |
+| run_C      | `config/rag/run_C_api.yaml`      | `bash jobs/01_collect.sh run_C http://localhost:8000`      |
+| run_C_ctrl | `config/rag/run_C_ctrl_api.yaml` | `bash jobs/01_collect.sh run_C_ctrl http://localhost:8000` |
+| run_D      | `config/retrieve/run_D.yaml`     | `bash jobs/01_collect.sh run_D http://localhost:8001`      |
+| run_E      | `config/retrieve/run_E.yaml`     | `bash jobs/01_collect.sh run_E http://localhost:8001`      |
+| run_F      | `config/retrieve/run_F.yaml`     | `bash jobs/01_collect.sh run_F http://localhost:8001`      |
+
 
 ---
 
