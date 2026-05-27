@@ -9,7 +9,7 @@
 #
 # Optional env:
 #   WORKDIR         parent of this repo (default: parent of BENCH_ROOT)
-#   MMORE_GIT_URL   default: https://github.com/swiss-ai/mmore.git
+#   MMORE_GIT_URL   default: https://github.com/chadiaitekioui/mmore.git (fork until PR #312 merges)
 #   MMORE_GIT_BRANCH  default: llm-as-a-judge
 #   MMORE_DEVICE         cpu (default) or cu126 for GPU torch on process/index
 #   INSTALL_HF_ANNOTATE  1 = also pip install -r requirements-hf-annotate.txt (default: 0)
@@ -21,7 +21,7 @@ WORKDIR="${WORKDIR:-$(cd "${BENCH_ROOT}/.." && pwd)}"
 WORKDIR="$(mkdir -p "$WORKDIR" && cd "$WORKDIR" && pwd)"
 
 MMORE_ROOT="${WORKDIR}/mmore"
-MMORE_GIT_URL="${MMORE_GIT_URL:-https://github.com/swiss-ai/mmore.git}"
+MMORE_GIT_URL="${MMORE_GIT_URL:-https://github.com/chadiaitekioui/mmore.git}"
 MMORE_GIT_BRANCH="${MMORE_GIT_BRANCH:-llm-as-a-judge}"
 
 clone_mmore() {
