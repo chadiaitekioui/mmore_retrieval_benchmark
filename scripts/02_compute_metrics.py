@@ -26,22 +26,13 @@ from bench_io import (  # noqa: E402
     chunk_id,
     chunks_from_entry,
     extract_judge_metrics,
+    hit_at_k,
     k_for_run,
     load_ground_truth,
     load_retriever_json,
+    mrr_at_k,
     query_from_entry,
 )
-
-
-def hit_at_k(labels: list[bool], k: int) -> float:
-    return float(any(labels[:k]))
-
-
-def mrr_at_k(labels: list[bool], k: int) -> float:
-    for rank, rel in enumerate(labels[:k], 1):
-        if rel:
-            return 1.0 / rank
-    return 0.0
 
 
 def ndcg_at_k(labels: list[bool], k: int) -> float:
@@ -88,7 +79,7 @@ def main():
     # Judge runs (run_C / run_C_ctrl) have 10 chunks per question after the
     # corrective loop. We keep the existing primary evaluation at k_for_run
     # (Hit@5 today) and additionally compute ranking metrics at Hit@10.
-    eval_k10 = run_name in ("run_C", "run_C_ctrl")
+    eval_k10 = run_name == "run_C" or run_name == "run_C_ctrl" or run_name.startswith("run_C_suff_")
     k10 = 10
 
     hits, mrrs, ndcgs, precs, recs = [], [], [], [], []
@@ -112,7 +103,7 @@ def main():
         labels, n_unlabeled = align_labels_for_run(labels_map, run_chunks)
         n_unlabeled_total += n_unlabeled
 
-        hit = int(hit_at_k(labels, k))
+        hit = int(hit_at_k(labels, k))  # bool → int
         hits.append(hit)
         mrrs.append(mrr_at_k(labels, k))
         ndcgs.append(ndcg_at_k(labels, k))

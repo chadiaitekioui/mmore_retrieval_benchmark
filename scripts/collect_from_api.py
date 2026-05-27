@@ -101,6 +101,16 @@ def main():
     parser.add_argument("--base-url", required=True, help="e.g. http://localhost:8001")
     parser.add_argument("--rag-endpoint", default="/rag")
     parser.add_argument("--k", type=int, default=5)
+    parser.add_argument(
+        "--query-key",
+        default="input",
+        help="JSONL field sent to the API (e.g. hyde_input for run_H)",
+    )
+    parser.add_argument(
+        "--record-query-key",
+        default="input",
+        help="JSONL field stored as query in chunks.json (ground-truth key)",
+    )
     parser.add_argument("--file-ids", default="", help="Comma-separated fileIds for retriever filter")
     parser.add_argument("--min-similarity", type=float, default=-1.0)
     parser.add_argument("--sleep", type=float, default=0.0, help="Pause between requests (seconds)")
@@ -117,9 +127,13 @@ def main():
 
     with httpx.Client() as client:
         for i, row in enumerate(queries):
-            query = row.get("input") or row.get("query") or ""
-            if not query:
-                print(f"  [!] line {i}: missing query/input")
+            record_query = row.get(args.record_query_key) or row.get("input") or row.get("query") or ""
+            api_query = row.get(args.query_key) or record_query
+            if not record_query:
+                print(f"  [!] line {i}: missing {args.record_query_key!r}")
+                continue
+            if not api_query:
+                print(f"  [!] line {i}: missing {args.query_key!r}")
                 continue
 
             try:
@@ -127,7 +141,7 @@ def main():
                     payload = post_retrieve(
                         client,
                         args.base_url,
-                        query,
+                        api_query,
                         args.k,
                         file_ids,
                         args.min_similarity,
@@ -138,17 +152,17 @@ def main():
                         client,
                         args.base_url,
                         args.rag_endpoint,
-                        query,
+                        api_query,
                         collection,
                     )
             except httpx.HTTPError as e:
-                print(f"  [!] {query[:50]}… : {e}")
-                results.append({"query": query, "chunks": [], "error": str(e)})
+                print(f"  [!] {record_query[:50]}… : {e}")
+                results.append({"query": record_query, "chunks": [], "error": str(e)})
                 continue
 
-            entry = entry_from_api_payload(query, payload)
+            entry = entry_from_api_payload(record_query, payload)
             results.append(entry)
-            raw_log.append({"query": query, "response": payload})
+            raw_log.append({"query": record_query, "api_query": api_query, "response": payload})
 
             n_chunks = len(chunks_from_entry(entry))
             if (i + 1) % 10 == 0:

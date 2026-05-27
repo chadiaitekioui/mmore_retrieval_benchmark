@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Collect all 7 runs in one terminal: start MMORE per config, HTTP collect, stop server.
+# Collect all 9 runs in one terminal: start MMORE per config, HTTP collect, stop server.
 #
 # Prerequisites:
 #   source env.benchmark
@@ -15,7 +15,8 @@
 #   MMORE_RETRIEVER_PORT=8001   retriever API (runs A,B,D,E,F)
 #   MMORE_RAG_PORT=8000         RAG + judge (runs C, C_ctrl)
 #   MMORE_STARTUP_WAIT=600      seconds max wait per server start
-#   RUNS="run_A run_B ..."      subset (default: all 7)
+#   RUNS="run_A run_B ..."      subset (default: all 9)
+#   For run_H: bash jobs/prepare_hyde_queries.sh first
 
 set -euo pipefail
 
@@ -34,7 +35,7 @@ fi
 RETRIEVER_PORT="${MMORE_RETRIEVER_PORT:-8001}"
 RAG_PORT="${MMORE_RAG_PORT:-8000}"
 STARTUP_WAIT="${MMORE_STARTUP_WAIT:-600}"
-ALL_RUNS=(run_A run_B run_C run_C_ctrl run_D run_E run_F)
+ALL_RUNS=(run_A run_B run_C run_C_ctrl run_D run_E run_F run_G run_H)
 
 if [[ -n "${RUNS:-}" ]]; then
   # shellcheck disable=SC2206
@@ -70,6 +71,10 @@ config_for_run() {
   case "$1" in
     run_C) echo "${ROOT}/config/rag/run_C_api.yaml" ;;
     run_C_ctrl) echo "${ROOT}/config/rag/run_C_ctrl_api.yaml" ;;
+    run_C_suff_*)
+      tag="${1#run_C_suff_}"
+      echo "${ROOT}/config/rag/calib/run_C_suff_${tag}.yaml"
+      ;;
     *) echo "${ROOT}/config/retrieve/${1}.yaml" ;;
   esac
 }
@@ -96,7 +101,7 @@ start_mmore() {
   stop_mmore
 
   case "$run" in
-    run_C|run_C_ctrl)
+    run_C|run_C_ctrl|run_C_suff_*)
       require_hf_token_for_rag "$run"
       echo "=== Start MMORE RAG (${run}) on :${RAG_PORT} ==="
       python -m mmore rag --config-file "$cfg" &

@@ -6,7 +6,7 @@ Benchmark repository to evaluate MMORE retrieval quality on **MedXpertQA (200 qu
 
 1. Install — clone this repo, then `install.sh` clones MMORE + venv.
 2. MedXpertQA data — clinical MedRAG corpus (`proc_demo.db`) + 200 questions JSONL.
-3. Collect — 7 retrieval configs → `results/*/chunks.json`.
+3. Collect — 9 retrieval configs → `results/*/chunks.json`.
 4. Annotate — ground truth labels (`data/ground_truth.json`).
 5. Metrics / Compare — Hit@k, MRR, NDCG, McNemar → `results/summary.json`.
 
@@ -84,21 +84,28 @@ bash jobs/setup_medxpertqa.sh              # MedRAG clinical corpus (default)
 # CORPUS=plos bash jobs/setup_medxpertqa.sh 5000 # legacy PLoS-5k
 ```
 
-See [corpus/README.md](corpus/README.md) for sources and NCBI StatPearls rebuild instructions.
+`CLEAN_DB=1` (default) recreates `proc_demo.db` on each corpus build. 
 
-`CLEAN_DB=1` (default) recreates `proc_demo.db` on each corpus build. **Re-run `jobs/ground_truth.sh` after re-indexing** (labels are corpus-specific).
+Re-run `jobs/ground_truth.sh` after re-indexing (labels are corpus-specific).
 
 ---
 
-## Collect retrieval results (7 runs)
+## Collect retrieval results (9 runs)
 
 **Requires:** [Hugging Face token](#prerequisites-hugging-face-gated-llama) (for `run_C` / `run_C_ctrl`).
+
+**Before collect for `run_H`:**
+
+```bash
+export OPENAI_API_KEY=sk-...   # or HF model
+bash jobs/prepare_hyde_queries.sh
+```
 
 ```bash
 bash jobs/collect_all.sh
 ```
 
-`collect_all.sh`: for each run A→F: start MMORE, 200 HTTP queries, `results/<run>/chunks.json`, stop MMORE. Ports `8001` (retrieve) / `8000` (RAG).
+`collect_all.sh`: for each run A→H: start MMORE, 200 HTTP queries, `results/<run>/chunks.json`, stop MMORE.
 
 ---
 
@@ -122,13 +129,13 @@ Output: `data/ground_truth.json`.
 
 ## Evaluation
 
-**Requires:** `ground_truth.json` + all 7 `results/run_*/chunks.json`.
+**Requires:** `ground_truth.json` + all 9 `results/run_*/chunks.json`.
 
 ```bash
 bash jobs/evaluate.sh
 ```
 
-Writes `results/<run>/metrics.json` and `results/summary.json` (McNemar: B→C @ Hit@5, F→C and C_ctrl→C @ Hit@10).
+Writes `results/<run>/metrics.json` and `results/summary.json`
 
 ---
 
@@ -143,8 +150,34 @@ Writes `results/<run>/metrics.json` and `results/summary.json` (McNemar: B→C @
 | `run_C_ctrl` | yes      | thresholds only | 0.5    | 5 (+ Hit@10 eval) | `mmore rag`      |
 | `run_D`      | yes      | no              | 0.0    | 5                 | `mmore retrieve` |
 | `run_E`      | yes      | no              | 1.0    | 5                 | `mmore retrieve` |
-| `run_F`      | yes      | no              | 0.5    | 10                | `mmore retrieve` |
+| `run_F`      | no       | no              | 0.5    | 10                | `mmore retrieve` |
+| `run_G`      | yes      | no              | 0.5    | 10                | `mmore retrieve` |
+| `run_H`      | yes      | no (HyDE query) | 0.5    | 5                 | `mmore retrieve` |
 
 
 Primary judge comparison (legacy): `run_B → run_C` at Hit@5.  
-Judge widening: `run_F → run_C` and `run_C_ctrl → run_C` at Hit@10.
+Judge widening: `run_F → run_C` and `run_C_ctrl → run_C` at Hit@10.  
+Rerank isolation @10: `run_F → run_G` (same k, +BGE rerank).  
+HyDE @5: `run_B → run_H` (hypothetical passage embedded instead of raw vignette; `jobs/prepare_hyde_queries.sh`).
+
+---
+
+## Judge calibration
+
+The default judge uses `min_context_relevance: 7.0` (sufficiency **0.7** on the 1–10 score scale). A **99.5% corrective rate** usually means the LLM almost always triggers a corrective action.
+
+### Threshold sweep (corrective rate vs Hit@10)
+
+```bash
+# Offline curve from existing run_C (simulated threshold-only corrective rate):
+bash jobs/judge_calibration.sh
+
+# Curve (4× run_C collect with sufficiency 0.3 / 0.5 / 0.7 / 0.9):
+export HF_TOKEN=hf_...
+bash jobs/collect_judge_calibration.sh
+bash jobs/evaluate_judge_calibration.sh
+bash jobs/judge_calibration.sh
+```
+
+Outputs: `results/judge_calibration/calibration.json`, `calibration_curve.png`, `per_question_judge_gt.json`.
+

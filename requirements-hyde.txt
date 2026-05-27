@@ -1,0 +1,5 @@
+# HyDE query expansion (run_H). Install: pip install -r requirements-hyde.txt
+langchain-classic>=1.0.0
+langchain-core>=0.3.0
+langchain-openai>=0.3.0
+langchain-community>=0.3.0

@@ -18,6 +18,8 @@ RUN_K: dict[str, int] = {
     "run_D": 5,
     "run_E": 5,
     "run_F": 10,
+    "run_G": 10,
+    "run_H": 5,
 }
 
 GT_VERSION = 2
@@ -283,3 +285,14 @@ def k_for_run(run_name: str, override: int | None = None) -> int:
     if override is not None:
         return override
     return RUN_K.get(run_name, 5)
+
+
+def hit_at_k(labels: list[bool], k: int) -> bool:
+    return any(labels[:k])
+
+
+def mrr_at_k(labels: list[bool], k: int) -> float:
+    for rank, rel in enumerate(labels[:k], 1):
+        if rel:
+            return 1.0 / rank
+    return 0.0

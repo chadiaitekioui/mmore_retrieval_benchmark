@@ -7,7 +7,7 @@
 #   bash jobs/01_collect.sh run_B http://localhost:8001
 #   bash jobs/01_collect.sh run_C http://localhost:8000
 #
-# Runs: run_A run_B run_C run_C_ctrl run_D run_E run_F
+# Runs: run_A … run_F run_G run_H
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -17,8 +17,8 @@ RUN="${1:?Usage: $0 RUN BASE_URL   e.g. run_B http://localhost:8001}"
 BASE_URL="${2:?Missing BASE_URL}"
 
 case "$RUN" in
-  run_C|run_C_ctrl) API_TYPE="rag" ;;
-  run_A|run_B|run_D|run_E|run_F) API_TYPE="retriever" ;;
+  run_C|run_C_ctrl|run_C_suff_*) API_TYPE="rag" ;;
+  run_A|run_B|run_D|run_E|run_F|run_G|run_H) API_TYPE="retriever" ;;
   *)
     echo "Unknown run: $RUN" >&2
     exit 1
@@ -26,18 +26,37 @@ case "$RUN" in
 esac
 
 case "$RUN" in
-  run_F) K=10 ;;
+  run_F|run_G) K=10 ;;
+  run_C_suff_*) K=5 ;;  # initial retrieve k; Hit@10 computed at eval
   *) K=5 ;;
 esac
 
-QUERIES="${QUERIES:-data/medxpertqa_200_mmore.jsonl}"
+QUERY_KEY="input"
+RECORD_QUERY_KEY="input"
+COLLECT_EXTRA=()
+
+case "$RUN" in
+  run_H)
+    QUERIES="${QUERIES:-data/medxpertqa_200_hyde_mmore.jsonl}"
+    QUERY_KEY="hyde_input"
+    if [[ ! -f "$QUERIES" ]]; then
+      echo "Missing HyDE queries: $QUERIES" >&2
+      echo "  bash jobs/prepare_hyde_queries.sh" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    QUERIES="${QUERIES:-data/medxpertqa_200_mmore.jsonl}"
+    ;;
+esac
+
 OUT="results/${RUN}/chunks.json"
 RAW="results/${RUN}/raw_api.json"
 
 pip install -r requirements.txt -q
 mkdir -p "results/${RUN}"
 
-echo "=== Collect $RUN (api=$API_TYPE k=$K) → $OUT ==="
+echo "=== Collect $RUN (api=$API_TYPE k=$K queries=$QUERIES) → $OUT ==="
 
 python scripts/collect_from_api.py \
   --queries "$QUERIES" \
@@ -45,6 +64,9 @@ python scripts/collect_from_api.py \
   --api-type "$API_TYPE" \
   --base-url "$BASE_URL" \
   --k "$K" \
-  --raw-out "$RAW"
+  --query-key "$QUERY_KEY" \
+  --record-query-key "$RECORD_QUERY_KEY" \
+  --raw-out "$RAW" \
+  "${COLLECT_EXTRA[@]}"
 
 echo "✓ $OUT"

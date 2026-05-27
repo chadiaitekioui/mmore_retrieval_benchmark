@@ -24,7 +24,7 @@ if [[ ! -f "${ROOT}/data/ground_truth.json" ]]; then
   exit 1
 fi
 
-for run in run_A run_B run_C run_C_ctrl run_D run_E run_F; do
+for run in run_A run_B run_C run_C_ctrl run_D run_E run_F run_G run_H; do
   if [[ ! -f "results/${run}/chunks.json" ]]; then
     echo "Missing results/${run}/chunks.json — run collect first." >&2
     exit 1
