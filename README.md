@@ -4,17 +4,19 @@ Benchmark repository to evaluate MMORE retrieval quality on **MedXpertQA (200 qu
 
 ## What this repo does
 
-1. **Install** — clone this repo, then `install.sh` clones MMORE + venv.
-2. **MedXpertQA data** — PLOS corpus (`proc_demo.db`) + 200 questions JSONL.
-3. **Collect** — 7 retrieval configs → `results/*/chunks.json`.
-4. **Annotate** — ground truth labels (`data/ground_truth.json`).
-5. **Metrics / compare** — Hit@k, MRR, NDCG, McNemar → `results/summary.json`.
+1. Install — clone this repo, then `install.sh` clones MMORE + venv.
+2. MedXpertQA data — PLOS corpus (`proc_demo.db`) + 200 questions JSONL.
+3. Collect — 7 retrieval configs → `results/*/chunks.json`.
+4. Annotate — ground truth labels (`data/ground_truth.json`).
+5. Metrics / Compare — Hit@k, MRR, NDCG, McNemar → `results/summary.json`.
 
 Every step after install assumes you are in the benchmark tree with the environment loaded.
 
+**Before collect (step 3):** set up [Hugging Face access](#prerequisites-hugging-face-gated-llama) for `meta-llama/Llama-3.1-8B-Instruct` (runs `run_C`, `run_C_ctrl`).
+
 ---
 
-## 1. Install
+## Install
 
 ### Clone this repo, then install
 
@@ -26,9 +28,9 @@ bash install.sh # or INSTALL_HF_ANNOTATE=1 bash install.sh if you are using HF m
 source env.benchmark
 ```
 
-`install.sh` clones `../mmore` (`swiss-ai/mmore`, branch `llm-as-a-judge`), creates `../hf_cache`, `.venv`, and `env.benchmark`.
+`install.sh` clones `../mmore` (`swiss-ai/mmore`, branch `llm-as-a-judge`) and creates `../hf_cache`, `.venv`, and `env.benchmark`.
 
-Layout:
+What your workspace folder should look like:
 
 ```text
 /workspace/
@@ -37,37 +39,57 @@ Layout:
   hf_cache/
 ```
 
+## Prerequisites: Hugging Face (gated Llama)
 
-| Variable                      | After install                                |
-| ----------------------------- | -------------------------------------------- |
-| `WORKDIR`                     | parent of benchmark repo (e.g. `/workspace`) |
-| `BENCH_ROOT`                  | this repo                                    |
-| `MMORE_ROOT`                  | `$WORKDIR/mmore`                             |
-| `HF_HOME`                     | `$WORKDIR/hf_cache`                          |
-| `DB_URI`                      | `$BENCH_ROOT/proc_demo.db`                   |
-| `DB_NAME` / `COLLECTION_NAME` | `my_db`                                      |
+Runs `run_C` and `run_C_ctrl` load `meta-llama/Llama-3.1-8B-Instruct` locally (RAG LLM + judge). That model is gated on Hugging Face: without account access and a token, MMORE fails with `401` / `GatedRepoError` when starting the RAG server.
 
+The same token is needed if you annotate ground truth with the local HF model (step 4) instead of OpenAI.
+
+### One-time setup
+
+1. Create a [Hugging Face](https://huggingface.co/join) account.
+2. Open [meta-llama/Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct), accept Meta’s license, and wait until access is granted (usually minutes; sometimes longer).
+3. Create a token: [Settings → Access Tokens](https://huggingface.co/settings/tokens).
+
+### Every session (cluster or laptop)
+
+Export the token
+
+```bash
+export HF_TOKEN=hf_xxxxxxxx
+huggingface-cli login
+```
+
+`HF_HOME` from `env.benchmark` points model weights to `$WORKDIR/hf_cache`; the token is separate and must still be set.
+
+### Verify access
+
+```bash
+source env.benchmark
+export HF_TOKEN=hf_xxxxxxxx
+python -c "from huggingface_hub import hf_hub_download; hf_hub_download('meta-llama/Llama-3.1-8B-Instruct', 'config.json'); print('OK')"
+```
+
+If this prints `OK`, you can run `jobs/collect_all.sh` through the `run_C` / `run_C_ctrl` steps.
 
 ---
 
-## 2. MedXpertQA data (corpus + queries)
+## MedXpertQA data
 
-**Requires:** `source env.benchmark`. GPU recommended for corpus indexing.
-
-One command (build `proc_demo.db` + `data/medxpertqa_200*.jsonl`):
+Builds `proc_demo.db` and `data/medxpertqa_200*.jsonl`:
 
 ```bash
 bash jobs/setup_medxpertqa.sh        # PLOS-1k (default)
 # bash jobs/setup_medxpertqa.sh 5000   # PLOS-5k
 ```
 
-`CLEAN_DB=1` (default) recreates `proc_demo.db` on each corpus build. Details: `corpus/README.md`.
+`CLEAN_DB=1` (default) recreates `proc_demo.db` on each corpus build.
 
 ---
 
-## 3. Collect retrieval results (7 runs)
+## Collect retrieval results (7 runs)
 
-**Requires:** MedXpertQA data ready, `source env.benchmark`.
+**Requires:** [Hugging Face token](#prerequisites-hugging-face-gated-llama) (for `run_C` / `run_C_ctrl`).
 
 ```bash
 bash jobs/collect_all.sh
@@ -77,22 +99,17 @@ bash jobs/collect_all.sh
 
 ---
 
-## 4. Build ground truth
-
-**Requires:** `source env.benchmark`; collect done for `run_A`, `run_B`, `run_C`.
+## Build ground truth
 
 ```bash
 export OPENAI_API_KEY=sk-...
 ```
 
-Or
+Or (local HF annotator):
 
 ```bash
-export HF_TOKEN=hf_...
+export HF_TOKEN=hf_xxxxxxxx
 export ANNOTATOR_MODEL=meta-llama/Llama-3.1-8B-Instruct
-```
-
-```bash
 bash jobs/ground_truth.sh
 ```
 
@@ -100,7 +117,7 @@ Output: `data/ground_truth.json`.
 
 ---
 
-## 5. Evaluation
+## Evaluation
 
 **Requires:** `ground_truth.json` + all 7 `results/run_*/chunks.json`.
 

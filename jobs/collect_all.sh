@@ -3,7 +3,8 @@
 #
 # Prerequisites:
 #   source env.benchmark
-#   proc_demo.db built (jobs/build_corpus.sh)
+#   export HF_TOKEN=hf_...   # gated Llama for run_C / run_C_ctrl (README § Prerequisites)
+#   proc_demo.db built (jobs/setup_medxpertqa.sh)
 #   bash jobs/00_prepare.sh
 #
 # Usage:
@@ -73,6 +74,16 @@ config_for_run() {
   esac
 }
 
+require_hf_token_for_rag() {
+  if [[ -n "${HF_TOKEN:-}" ]] || huggingface-cli whoami &>/dev/null; then
+    return 0
+  fi
+  echo "Missing HF_TOKEN for ${1} (gated meta-llama/Llama-3.1-8B-Instruct)." >&2
+  echo "  See README.md — Prerequisites: Hugging Face (gated Llama)" >&2
+  echo "  export HF_TOKEN=hf_...   # or: huggingface-cli login" >&2
+  exit 1
+}
+
 start_mmore() {
   local run="$1"
   local cfg
@@ -86,6 +97,7 @@ start_mmore() {
 
   case "$run" in
     run_C|run_C_ctrl)
+      require_hf_token_for_rag "$run"
       echo "=== Start MMORE RAG (${run}) on :${RAG_PORT} ==="
       python -m mmore rag --config-file "$cfg" &
       MMORE_PID=$!

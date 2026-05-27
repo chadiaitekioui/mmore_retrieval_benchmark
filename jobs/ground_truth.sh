@@ -9,7 +9,7 @@
 #   export OPENAI_API_KEY=sk-...
 #   bash jobs/ground_truth.sh
 #
-# Hugging Face annotator:
+# Hugging Face annotator (gated Llama — see README § Prerequisites):
 #   export HF_TOKEN=hf_...
 #   export ANNOTATOR_MODEL=meta-llama/Llama-3.1-8B-Instruct
 #   bash jobs/ground_truth.sh

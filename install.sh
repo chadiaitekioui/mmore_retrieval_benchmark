@@ -97,3 +97,8 @@ pip install -e "${MMORE_ROOT}[rag,api]"
 
 echo ""
 echo "Installation complete."
+echo ""
+echo "Next: source env.benchmark"
+echo "  Hugging Face (required for run_C / run_C_ctrl): accept access at"
+echo "  https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct then:"
+echo "    export HF_TOKEN=hf_...   # see README.md § Prerequisites"
