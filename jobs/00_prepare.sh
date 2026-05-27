@@ -11,7 +11,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-pip install -r requirements.txt -q
+if [[ -f "${ROOT}/env.benchmark" ]]; then
+  # shellcheck disable=SC1091
+  source "${ROOT}/env.benchmark"
+fi
 
 python scripts/00_prepare_dataset.py \
   --collection-name "${COLLECTION_NAME:-my_db}" \

@@ -30,7 +30,6 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 MODEL="${ANNOTATOR_MODEL:-gpt-4o-mini}"
-pip install -r requirements.txt -q
 if [[ "$MODEL" == */* ]] || [[ "$MODEL" == "local" ]] || [[ "$MODEL" == "hf" ]]; then
   pip install -r requirements-hf-annotate.txt -q
 fi

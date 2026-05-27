@@ -85,8 +85,16 @@ def main():
     gt_map = load_ground_truth(Path(args.gt))
     run_data = load_retriever_json(Path(args.chunks))
 
+    # Judge runs (run_C / run_C_ctrl) have 10 chunks per question after the
+    # corrective loop. We keep the existing primary evaluation at k_for_run
+    # (Hit@5 today) and additionally compute ranking metrics at Hit@10.
+    eval_k10 = run_name in ("run_C", "run_C_ctrl")
+    k10 = 10
+
     hits, mrrs, ndcgs, precs, recs = [], [], [], [], []
     per_question: list[dict] = []
+    hits10, mrrs10, ndcgs10, precs10, recs10 = [], [], [], [], []
+    per_question_k10: list[dict] = []
     judge_scores, sufficient_flags, corrective_flags = [], [], []
     sim_means, rerank_means = [], []
     n_skipped = 0
@@ -110,6 +118,16 @@ def main():
         ndcgs.append(ndcg_at_k(labels, k))
         precs.append(precision_at_k(labels, k))
         recs.append(recall_at_k(labels, k))
+
+        if eval_k10:
+            hit10 = int(hit_at_k(labels, k10))
+            hits10.append(hit10)
+            mrrs10.append(mrr_at_k(labels, k10))
+            ndcgs10.append(ndcg_at_k(labels, k10))
+            precs10.append(precision_at_k(labels, k10))
+            recs10.append(recall_at_k(labels, k10))
+            # For k=10 McNemar we need per-question hit vectors.
+            per_question_k10.append({"query": query, "hit": hit10})
 
         jm = extract_judge_metrics(entry)
         if jm["context_relevance_score"] is not None:
@@ -170,6 +188,24 @@ def main():
         ),
     }
 
+    if eval_k10 and hits10:
+        n10 = len(hits10)
+        p_hit10 = sum(hits10) / n10
+        ci10 = wilson_ci(p_hit10, n10)
+        metrics.update(
+            {
+                f"hit_at_{k10}": round(p_hit10, 4),
+                f"hit_at_{k10}_ci_95": ci10,
+                f"mrr_at_{k10}": round(sum(mrrs10) / n10, 4),
+                f"ndcg_at_{k10}": round(sum(ndcgs10) / n10, 4),
+                f"precision_at_{k10}": round(sum(precs10) / n10, 4),
+                f"recall_at_{k10}": round(sum(recs10) / n10, 4),
+                "eval_k_max": k10,
+                # For judge runs, the "judge evaluation" we care about is at k=10.
+                "eval_k_primary": k10,
+            }
+        )
+
     if judge_scores and len(judge_scores) == n:
         r, p = stats.pointbiserialr(judge_scores, hits)
         metrics["judge_hit_correlation"] = {"r": round(r, 4), "p": round(p, 4)}
@@ -208,14 +244,25 @@ def main():
     with hits_path.open("w") as f:
         json.dump(per_question, f, indent=2)
 
+    if eval_k10 and per_question_k10:
+        hits_path_k10 = out_path.parent / "per_question_hits_k10.json"
+        with hits_path_k10.open("w") as f:
+            json.dump(per_question_k10, f, indent=2)
+
     print(f"\n{'─'*50}")
     print(f"  Run {run_name} | n={n} | k={k} | unlabeled chunks={n_unlabeled_total}")
     print(f"  Hit@{k} = {p_hit:.3f}  CI {ci}")
     print(f"  MRR@{k} = {metrics[f'mrr_at_{k}']:.3f}  NDCG@{k} = {metrics[f'ndcg_at_{k}']:.3f}")
+    if eval_k10 and hits10:
+        print(
+            f"  Hit@{k10} = {metrics[f'hit_at_{k10}']:.3f}  CI {metrics[f'hit_at_{k10}_ci_95']}"
+        )
     if stratification:
         print(f"  Stratification vs {args.reference_run}: {stratification}")
     print(f"✓ {out_path}")
     print(f"✓ {hits_path}")
+    if eval_k10 and per_question_k10:
+        print(f"✓ {hits_path_k10}")
 
 
 if __name__ == "__main__":

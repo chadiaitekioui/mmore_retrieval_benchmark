@@ -1,5 +1,4 @@
-# Benchmark dependencies only — MMORE is NOT installed here.
-# MMORE runs in its own deployment (Docker / venv on Run:ai); this repo calls it via HTTP.
+# Benchmark Python deps (MMORE installed separately in install.sh).
 datasets>=2.14.0
 scipy>=1.11.0
 openai>=1.0.0        # GT annotation; optional OPENAI_BASE_URL for vLLM

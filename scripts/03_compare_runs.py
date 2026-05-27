@@ -75,6 +75,24 @@ def load_per_question_hits(results_dir: Path, run_name: str) -> list[int]:
     return [int(r["hit"]) for r in rows]
 
 
+def load_per_question_hits_at_k(results_dir: Path, run_name: str, k: int) -> list[int]:
+    """Load per-question hit vector evaluated at a specific k.
+
+    Preferred file: per_question_hits_k{k}.json.
+    Fallback: per_question_hits.json when k matches the run's default retrieval k.
+    """
+    path_k = results_dir / run_name / f"per_question_hits_k{k}.json"
+    if path_k.exists():
+        with path_k.open() as f:
+            rows = json.load(f)
+        return [int(r["hit"]) for r in rows]
+
+    if k == k_for_run(run_name):
+        return load_per_question_hits(results_dir, run_name)
+
+    return []
+
+
 def hit_key(metrics: dict) -> tuple[int, float]:
     k = metrics.get("k", 5)
     return k, metrics.get(f"hit_at_{k}", 0.0)
@@ -142,6 +160,8 @@ def main():
     if not runs:
         raise SystemExit(f"No metrics.json found in {results_dir}")
 
+    runs_by_name = {r["run"]: r for r in runs}
+
     print(f"\n{'='*60}")
     print(f"  BENCHMARK RETRIEVAL — {len(runs)} runs")
     print(f"{'='*60}")
@@ -185,14 +205,52 @@ def main():
                 judge_comparisons.append(res2)
     print_mcnemar_block("McNemar — judge effect (reranker held constant)", judge_comparisons)
 
+    # Judge evaluation at Hit@10 (requires per_question_hits_k10.json for run_C / run_C_ctrl)
+    judge_comparisons_k10: list[dict] = []
+    hits_f10 = load_per_question_hits_at_k(results_dir, "run_F", 10)
+    hits_c10 = load_per_question_hits_at_k(results_dir, "run_C", 10)
+    hits_ctrl10 = load_per_question_hits_at_k(results_dir, "run_C_ctrl", 10)
+    if hits_f10 and hits_c10 and len(hits_f10) == len(hits_c10):
+        res_f = mcnemar_test(hits_f10, hits_c10)
+        res_f["comparison"] = "run_F → run_C (judge @10)"
+        judge_comparisons_k10.append(res_f)
+    if hits_ctrl10 and hits_c10 and len(hits_ctrl10) == len(hits_c10):
+        res_ctrl = mcnemar_test(hits_ctrl10, hits_c10)
+        res_ctrl["comparison"] = "run_C_ctrl → run_C (judge @10)"
+        judge_comparisons_k10.append(res_ctrl)
+    print_mcnemar_block("McNemar — judge effect at Hit@10", judge_comparisons_k10)
+
     summary = {
         "runs": runs,
         "mcnemar_baseline": baseline_comparisons,
         "mcnemar_judge": judge_comparisons,
+        "mcnemar_judge_k10": judge_comparisons_k10,
+        "judge_at_k10": {
+            "runs": [
+                {
+                    "run": "run_F",
+                    "hit_at_10": runs_by_name.get("run_F", {}).get("hit_at_10"),
+                    "hit_at_10_ci_95": runs_by_name.get("run_F", {}).get("hit_at_10_ci_95"),
+                },
+                {
+                    "run": "run_C",
+                    "hit_at_10": runs_by_name.get("run_C", {}).get("hit_at_10"),
+                    "hit_at_10_ci_95": runs_by_name.get("run_C", {}).get("hit_at_10_ci_95"),
+                },
+                {
+                    "run": "run_C_ctrl",
+                    "hit_at_10": runs_by_name.get("run_C_ctrl", {}).get("hit_at_10"),
+                    "hit_at_10_ci_95": runs_by_name.get("run_C_ctrl", {}).get("hit_at_10_ci_95"),
+                },
+            ],
+            "mcnemar_rows": judge_comparisons_k10,
+        },
         "methodology_notes": [
             "GT v2: labels per (query, chunk_id) from union of source runs.",
             "Primary judge test: run_B vs run_C (McNemar).",
-            "run_F evaluated at k=10; others at k=5.",
+            "Hit@10 judge test: run_F → run_C and run_C_ctrl → run_C (McNemar at k=10).",
+            "run_F evaluated at k=10; run_B remains evaluated at k=5 (only 5 chunks collected), so Hit@10 comparisons with run_B are not apples-to-apples.",
+            "Hit@10 computed additionally for judge runs (run_C, run_C_ctrl).",
             "Chunks collected via HTTP API or 04_convert (no run_rag.py changes).",
         ],
     }

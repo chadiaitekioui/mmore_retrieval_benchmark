@@ -2,11 +2,15 @@
 # Build proc_demo.db from PLOS articles: download → txt → process → postprocess → index.
 #
 # Prerequisites:
-#   - MMORE installed: pip install -e "${MMORE_ROOT}"
+#   - MMORE fork cloned next to benchmark (default: ../mmore) or set MMORE_ROOT
+#   - MMORE installed in current venv: pip install -e "${MMORE_ROOT}"
 #   - GPU recommended for index embeddings
 #
 # Usage:
-#   export MMORE_ROOT=/path/to/mmore   # fork, branch llm-as-a-judge
+#   # Recommended layout:
+#   #   /workdir/mmore
+#   #   /workdir/mmore_retrieval_benchmark
+#   export MMORE_ROOT=/workdir/mmore   # fork, branch llm-as-a-judge
 #   bash corpus/build_index.sh 1000    # PLOS-1k
 #   bash corpus/build_index.sh 5000    # PLOS-5k
 #
@@ -27,10 +31,13 @@ fi
 
 BENCH_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CORPUS_ROOT="${BENCH_ROOT}/corpus"
-MMORE_ROOT="${MMORE_ROOT:-}"
+MMORE_ROOT="${MMORE_ROOT:-$(cd "${BENCH_ROOT}/.." && pwd)/mmore}"
 
-if [[ -z "$MMORE_ROOT" || ! -d "$MMORE_ROOT/src/mmore" ]]; then
-  echo "Set MMORE_ROOT to your mmore fork (pip install -e \$MMORE_ROOT)." >&2
+if [[ ! -d "$MMORE_ROOT/src/mmore" ]]; then
+  echo "MMORE repo not found at: ${MMORE_ROOT}" >&2
+  echo "Clone your fork (branch llm-as-a-judge) next to this repo or set MMORE_ROOT." >&2
+  echo "Expected layout:" >&2
+  echo "  $(cd "${BENCH_ROOT}/.." && pwd)/mmore" >&2
   exit 1
 fi
 
@@ -100,6 +107,11 @@ python -m mmore postprocess \
 if [[ ! -f "$PP_OUT" ]]; then
   echo "Missing ${PP_OUT} after postprocess" >&2
   exit 1
+fi
+
+if [[ "${CLEAN_DB:-1}" == "1" && -f "$DB_URI" ]]; then
+  echo "=== Remove existing DB (CLEAN_DB=1): ${DB_URI} ==="
+  rm -f "$DB_URI"
 fi
 
 echo "=== MMORE index ==="
