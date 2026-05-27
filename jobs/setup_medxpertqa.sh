@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# MedXpertQA setup: PLOS corpus (proc_demo.db) + query JSONL (steps 2 + 3).
+# MedXpertQA setup: clinical corpus (MedRAG → proc_demo.db) + query JSONL.
 #
 # Prerequisites: install.sh done, then source env.benchmark
 #
 # Usage:
 #   source env.benchmark
-#   bash jobs/setup_medxpertqa.sh           # PLOS-1k + 200 questions
-#   bash jobs/setup_medxpertqa.sh 5000      # PLOS-5k
-#   bash jobs/setup_medxpertqa.sh 1000 --pilot
+#   bash jobs/setup_medxpertqa.sh              # MedRAG (StatPearls + textbooks)
+#   MEDRAG_PILOT=1 bash jobs/setup_medxpertqa.sh --pilot
+#   CORPUS=plos bash jobs/setup_medxpertqa.sh 5000   # legacy PLoS-5k
 #
-# Env: same as build_corpus.sh (CLEAN_DB, SKIP_DOWNLOAD, COLLECTION_NAME, …)
+# Env: same as build_corpus.sh (CLEAN_DB, SKIP_DOWNLOAD, MEDRAG_PILOT, …)
 
 set -euo pipefail
 
@@ -21,17 +21,30 @@ if [[ -f "${ROOT}/env.benchmark" ]]; then
   source "${ROOT}/env.benchmark"
 fi
 
-SIZE="1000"
+CORPUS="${CORPUS:-medrag}"
+SIZE=""
 PREPARE_ARGS=()
 for arg in "$@"; do
   case "$arg" in
-    1000|5000) SIZE="$arg" ;;
+    1000|5000)
+      if [[ "$CORPUS" == "plos" ]]; then
+        SIZE="$arg"
+      else
+        echo "[!] PLoS size '$arg' ignored (CORPUS=medrag). Use CORPUS=plos for PLoS." >&2
+      fi
+      ;;
     *) PREPARE_ARGS+=("$arg") ;;
   esac
 done
 
-echo "=== MedXpertQA setup (corpus ${SIZE} + queries) ==="
-bash "${ROOT}/jobs/build_corpus.sh" "$SIZE"
+if [[ "$CORPUS" == "plos" ]]; then
+  echo "=== MedXpertQA setup (PLoS-${SIZE:-1000} + queries) ==="
+  bash "${ROOT}/jobs/build_corpus.sh" "${SIZE:-1000}"
+else
+  echo "=== MedXpertQA setup (MedRAG clinical corpus + queries) ==="
+  bash "${ROOT}/jobs/build_corpus.sh"
+fi
+
 bash "${ROOT}/jobs/00_prepare.sh" "${PREPARE_ARGS[@]}"
 
 echo ""
@@ -41,3 +54,5 @@ echo "  data/medxpertqa_200_mmore.jsonl"
 echo "  DB_URI=${DB_URI:-${ROOT}/proc_demo.db}"
 echo "  export HF_TOKEN=hf_...   # README § Prerequisites (run_C / run_C_ctrl)"
 echo "  bash jobs/collect_all.sh"
+echo ""
+echo "After corpus change, re-run: bash jobs/ground_truth.sh"

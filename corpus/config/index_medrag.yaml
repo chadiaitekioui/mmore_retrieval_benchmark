@@ -1,0 +1,13 @@
+# Milvus Lite — MedRAG clinical corpus (same embeddings as PLoS benchmark)
+indexer:
+  dense_model:
+    model_name: BAAI/bge-small-en
+    is_multimodal: false
+  sparse_model:
+    model_name: splade
+    is_multimodal: false
+  db:
+    uri: ${DB_URI}
+    name: ${DB_NAME}
+collection_name: ${COLLECTION_NAME}
+documents_path: ${CORPUS_PP_OUT}

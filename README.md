@@ -5,7 +5,7 @@ Benchmark repository to evaluate MMORE retrieval quality on **MedXpertQA (200 qu
 ## What this repo does
 
 1. Install — clone this repo, then `install.sh` clones MMORE + venv.
-2. MedXpertQA data — PLOS corpus (`proc_demo.db`) + 200 questions JSONL.
+2. MedXpertQA data — clinical MedRAG corpus (`proc_demo.db`) + 200 questions JSONL.
 3. Collect — 7 retrieval configs → `results/*/chunks.json`.
 4. Annotate — ground truth labels (`data/ground_truth.json`).
 5. Metrics / Compare — Hit@k, MRR, NDCG, McNemar → `results/summary.json`.
@@ -76,14 +76,17 @@ If this prints `OK`, you can run `jobs/collect_all.sh` through the `run_C` / `ru
 
 ## MedXpertQA data
 
-Builds `proc_demo.db` and `data/medxpertqa_200*.jsonl`:
+Builds `proc_demo.db` (StatPearls + USMLE textbooks via [MedRAG](https://github.com/Teddy-XiongGZ/MedRAG)) and `data/medxpertqa_200*.jsonl`:
 
 ```bash
-bash jobs/setup_medxpertqa.sh        # PLOS-1k (default)
-# bash jobs/setup_medxpertqa.sh 5000   # PLOS-5k
+bash jobs/setup_medxpertqa.sh              # MedRAG clinical corpus (default)
+# MEDRAG_PILOT=1 bash jobs/setup_medxpertqa.sh --pilot   # 5k snippets smoke test, 30 questions
+# CORPUS=plos bash jobs/setup_medxpertqa.sh 5000 # legacy PLoS-5k
 ```
 
-`CLEAN_DB=1` (default) recreates `proc_demo.db` on each corpus build.
+See [corpus/README.md](corpus/README.md) for sources and NCBI StatPearls rebuild instructions.
+
+`CLEAN_DB=1` (default) recreates `proc_demo.db` on each corpus build. **Re-run `jobs/ground_truth.sh` after re-indexing** (labels are corpus-specific).
 
 ---
 

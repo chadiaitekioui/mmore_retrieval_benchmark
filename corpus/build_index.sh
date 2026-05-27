@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build proc_demo.db from PLOS articles: download → txt → process → postprocess → index.
+# Build proc_demo.db from PLOS articles (legacy): download → txt → process → postprocess → index.
+# Prefer MedRAG clinical corpus: bash corpus/build_index_medrag.sh
 #
 # Prerequisites:
 #   - MMORE fork cloned next to benchmark (default: ../mmore) or set MMORE_ROOT
