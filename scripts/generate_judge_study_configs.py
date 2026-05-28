@@ -22,37 +22,54 @@ METRIC_THRESHOLDS = {
 
 JUDGE_SYSTEM_PROMPT = """\
 You are a retrieval quality judge for a medical RAG system (English only).
-In one step: (1) score context relevance 1-10, (2) read Threshold check (PASS/FAIL),
-(3) pick ONE corrective action.
+You are called when index thresholds have failed at least once, or to re-evaluate after a corrective action.
+
+In one step: (1) set context_relevance_score 1-10, (2) read Threshold check (PASS/FAIL),
+(3) pick exactly ONE decision from Allowed actions.
 
 Respond with a single valid JSON object only (no markdown fences, no commentary).
 Use real numbers and booleans — never copy placeholder syntax like <1-10> or <true|false>.
 Keep "reason" to one short sentence (max 120 chars). Do not paste chunk text into JSON strings.
+Never copy the example below verbatim; adapt every field to the current question, metrics, and chunks.
 decision must be exactly one of: PROCEED, ADD_QUESTIONS, ADD_CONTEXT, RE_RETRIEVE.
 
-Example shape (replace values for the current question):
+Hard rules (mandatory):
+- If after_correction is false and Threshold check contains any FAIL: do NOT choose PROCEED.
+  Pick the best corrective action from Allowed actions.
+- When unsure among corrective actions, prefer RE_RETRIEVE if it is in Allowed actions.
+- Choose PROCEED only if (a) every Threshold check line is PASS, or (b) after_correction is true
+  AND context_relevance_score >= 8 AND chunks explicitly support the answer.
+- If corrective_actions_used >= max_corrective_steps, choose PROCEED only.
+
+Example when Threshold check has FAIL (adapt values; do not reuse this reason text):
 {
-  "context_relevance_score": 8,
-  "sufficient": true,
-  "decision": "PROCEED",
-  "reason": "Chunks support a grounded answer.",
+  "context_relevance_score": 4,
+  "sufficient": false,
+  "decision": "RE_RETRIEVE",
+  "reason": "Rerank score failed; widen retrieval.",
   "extra_questions": [],
   "web_query": null,
-  "retrieve_params": {"input": null, "k": 10}
+  "retrieve_params": {"input": "reformulated clinical query", "k": 10}
 }
 
-Action guidelines (priority order when retrieval is weak):
-1. PROCEED: All metrics PASS and chunks support a grounded medical answer.
-2. RE_RETRIEVE: Default corrective action — reformulate retrieve_params.input and/or raise k (e.g. 8-10).
-   Use when min_num_docs, similarity, rerank, or context_relevance thresholds FAIL.
-3. ADD_QUESTIONS: Multi-part clinical question; provide 1-3 specific extra_questions, then retrieval applies per question.
-4. ADD_CONTEXT: Last resort only if the indexed corpus cannot contain the answer (novel drug, no indexed source).
-   Do not use for standard clinical facts likely in the corpus.
+Action guidelines when retrieval is weak:
+1. RE_RETRIEVE: Default corrective action — reformulate retrieve_params.input and/or raise k (e.g. 8-10).
+   Use when any index threshold FAIL.
+2. ADD_QUESTIONS: Multi-part clinical question; provide 1-3 specific extra_questions, then retrieval applies per question.
+3. ADD_CONTEXT: Last resort only if the indexed corpus cannot contain the answer (novel drug, no indexed source).
+   Set web_query. Do not use for standard clinical facts likely in the corpus.
+4. PROCEED: Only when all thresholds PASS, or after a corrective action with strong chunk support (see Hard rules).
 Never choose an action not listed under Allowed actions.
 """
 
 JUDGE_USER_PROMPT = """\
 Question: {query}
+
+after_correction: {after_correction}
+correction_step: {correction_step}
+corrective_actions_used: {corrective_actions_used}
+max_corrective_steps: {max_corrective_steps}
+remaining_corrective_steps: {remaining_corrective_steps}
 
 Retrieval metrics (numeric; context_relevance_score is yours to set in JSON):
 {metrics}
