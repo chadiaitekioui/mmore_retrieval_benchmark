@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Collect run_C variants for judge sufficiency calibration (0.3 / 0.5 / 0.7 / 0.9).
+# Collect judge study runs (axis 2 + axis 3).
 #
 # Prerequisites:
 #   source env.benchmark
@@ -7,10 +7,12 @@
 #   proc_demo.db + data/medxpertqa_200_mmore.jsonl
 #
 # Usage:
-#   bash jobs/collect_judge_calibration.sh
+#   bash jobs/collect_judge_study.sh
 #
 # Outputs:
-#   results/run_C_suff_{030,050,070,090}/chunks.json
+#   results/run_steps_{0,1,2,3}/chunks.json
+#   results/run_judge_scout/chunks.json
+#   results/run_force_{rr,aq,ac}/chunks.json
 
 set -euo pipefail
 
@@ -23,13 +25,15 @@ if [[ -f "${ROOT}/env.benchmark" ]]; then
 fi
 
 : "${DB_URI:?source env.benchmark}"
-: "${HF_TOKEN:?HF_TOKEN required (gated Llama for run_C judge)}"
+: "${HF_TOKEN:?HF_TOKEN required (gated Llama)}"
 
 RAG_PORT="${MMORE_RAG_PORT:-8000}"
 STARTUP_WAIT="${MMORE_STARTUP_WAIT:-600}"
-CALIB_RUNS=(run_C_suff_030 run_C_suff_050 run_C_suff_070 run_C_suff_090)
-
-python scripts/generate_calib_configs.py
+STUDY_RUNS=(
+  run_steps_0 run_steps_1 run_steps_2 run_steps_3
+  run_judge_scout
+  run_force_rr run_force_aq run_force_ac
+)
 
 MMORE_PID=""
 stop_mmore() {
@@ -53,15 +57,11 @@ wait_url() {
   return 1
 }
 
-pip install -r requirements.txt -q
+pip install -r requirements.txt -q 2>/dev/null || true
 
-for run in "${CALIB_RUNS[@]}"; do
-  tag="${run#run_C_suff_}"
-  cfg="${ROOT}/config/rag/calib/run_C_suff_${tag}.yaml"
-  if [[ ! -f "$cfg" ]]; then
-    echo "Missing $cfg" >&2
-    exit 1
-  fi
+for run in "${STUDY_RUNS[@]}"; do
+  cfg="${ROOT}/config/rag/study/${run}.yaml"
+  [[ -f "$cfg" ]] || { echo "Missing $cfg — run: python scripts/generate_judge_study_configs.py" >&2; exit 1; }
   stop_mmore
   echo "=== Start MMORE RAG (${run}) ==="
   python -m mmore rag --config-file "$cfg" &
@@ -71,6 +71,6 @@ for run in "${CALIB_RUNS[@]}"; do
   stop_mmore
 done
 
-echo "✓ Calibration collects done. Next:"
-echo "  bash jobs/evaluate_judge_calibration.sh"
-echo "  bash jobs/judge_calibration.sh"
+echo "✓ Judge study collects done. Next:"
+echo "  bash jobs/evaluate_judge_study.sh"
+echo "  bash jobs/judge_study.sh"

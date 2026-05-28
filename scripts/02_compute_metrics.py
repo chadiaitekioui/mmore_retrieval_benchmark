@@ -79,7 +79,13 @@ def main():
     # Judge runs (run_C / run_C_ctrl) have 10 chunks per question after the
     # corrective loop. We keep the existing primary evaluation at k_for_run
     # (Hit@5 today) and additionally compute ranking metrics at Hit@10.
-    eval_k10 = run_name == "run_C" or run_name == "run_C_ctrl" or run_name.startswith("run_C_suff_")
+    eval_k10 = (
+        run_name == "run_C"
+        or run_name == "run_C_ctrl"
+        or run_name.startswith("run_steps_")
+        or run_name.startswith("run_force_")
+        or run_name == "run_judge_scout"
+    )
     k10 = 10
 
     hits, mrrs, ndcgs, precs, recs = [], [], [], [], []

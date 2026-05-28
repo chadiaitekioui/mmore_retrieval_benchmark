@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -145,8 +146,14 @@ def entry_from_api_payload(query: str, payload: dict) -> dict:
         for key in (
             "retrieval_metrics",
             "judge_decision",
+            "judge_reason",
             "judge_actions",
+            "judge_llm_calls",
+            "judge_steps",
+            "hit_max_corrective_steps",
             "retrieval_corrections",
+            "coerced_decision",
+            "coercion_trace",
             "input",
             "answer",
             "context",
@@ -231,6 +238,7 @@ def extract_judge_metrics(entry: dict) -> dict[str, Any]:
     rm = entry.get("retrieval_metrics") or {}
     actions = entry.get("judge_actions") or []
     decision = entry.get("judge_decision") or entry.get("decision")
+    corrections = entry.get("retrieval_corrections") or []
 
     ctx_score = entry.get("context_relevance_score")
     if ctx_score is None and rm:
@@ -240,10 +248,26 @@ def extract_judge_metrics(entry: dict) -> dict[str, Any]:
     if sufficient is None and rm:
         sufficient = bool(rm.get("thresholds_met"))
 
+    thresholds_met = rm.get("thresholds_met")
+    if thresholds_met is not None:
+        thresholds_met = bool(thresholds_met)
+
+    coerced = entry.get("coerced_decision")
+    if coerced is None and entry.get("judge_steps"):
+        coerced = any(s.get("coerced_decision") for s in entry["judge_steps"])
+
     return {
         "context_relevance_score": ctx_score,
         "sufficient": sufficient,
+        "thresholds_met": thresholds_met,
         "decision": decision,
+        "judge_reason": entry.get("judge_reason"),
+        "judge_actions": list(actions) if actions else [],
+        "judge_llm_calls": entry.get("judge_llm_calls"),
+        "judge_steps": entry.get("judge_steps") or [],
+        "hit_max_corrective_steps": entry.get("hit_max_corrective_steps"),
+        "retrieval_corrections": corrections,
+        "coerced_decision": coerced,
         "mean_similarity": rm.get("mean_similarity") or entry.get("mean_similarity"),
         "mean_rerank_score": rm.get("mean_rerank_score") or entry.get("mean_rerank_score"),
         "max_rerank_score": rm.get("max_rerank_score") or entry.get("max_rerank_score"),
@@ -295,3 +319,126 @@ def mrr_at_k(labels: list[bool], k: int) -> float:
         if rel:
             return 1.0 / rank
     return 0.0
+
+
+def parse_mcq_choice(answer: str) -> int | None:
+    """Extract chosen letter (0-based index) from RAG answer text or JSON."""
+    if not answer:
+        return None
+    text = answer
+    for marker in ("<|assistant|>", "assistant\n", "assistant"):
+        if marker in text:
+            text = text.split(marker)[-1]
+
+    # Structured answer: {"choice": "A", ...}
+    json_match = re.search(r'\{\s*"choice"\s*:\s*"([A-J])"', text, re.IGNORECASE)
+    if json_match:
+        return ord(json_match.group(1).upper()) - ord("A")
+
+    patterns = [
+        r"(?:correct answer is|the answer is|answer is)\s*\(?([A-J])\)?",
+        r"(?:option|choice)\s*\(?([A-J])\)?",
+        r"\(([A-J])\)\s+(?:is|Intrauterine|Serial|Topical|Administration)",
+    ]
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            return ord(m.group(1).upper()) - ord("A")
+
+    letters = re.findall(r"\(([A-J])\)", text)
+    if letters:
+        return ord(letters[-1].upper()) - ord("A")
+    return None
+
+
+def hit_max_corrective_steps(entry: dict) -> bool:
+    """True when MMORE exhausted max_corrective_steps without natural PROCEED."""
+    flag = entry.get("hit_max_corrective_steps")
+    if flag is not None:
+        return bool(flag == 1.0 or flag is True)
+    return entry.get("judge_reason") == "max_corrective_steps"
+
+
+def llm_calls_from_entry(entry: dict, *, skip_llm_judge: bool = False) -> dict[str, Any]:
+    """LLM call counts — prefer MMORE API fields, fallback to estimate."""
+    answer_calls = 1
+    if skip_llm_judge or entry.get("judge_reason") == "skip_llm_judge":
+        return {
+            "answer_llm_calls": answer_calls,
+            "judge_llm_calls": 0,
+            "total_llm_calls": answer_calls,
+            "from_api": True,
+        }
+
+    if entry.get("judge_llm_calls") is not None:
+        judge_calls = int(entry["judge_llm_calls"])
+        total = answer_calls + judge_calls
+        return {
+            "answer_llm_calls": answer_calls,
+            "judge_llm_calls": judge_calls,
+            "total_llm_calls": total,
+            "from_api": True,
+        }
+
+    est = estimate_llm_calls(entry, skip_llm_judge=skip_llm_judge)
+    return {
+        "answer_llm_calls": est["answer_llm_calls"],
+        "judge_llm_calls": est["judge_llm_calls_est"],
+        "total_llm_calls": est["total_llm_calls_est"],
+        "from_api": False,
+    }
+
+
+def trigger_queries_from_entries(entries: list[dict]) -> set[str]:
+    """Subset T: judge chose a corrective action (scout run)."""
+    out: set[str] = set()
+    for entry in entries:
+        q = query_from_entry(entry)
+        if not q:
+            continue
+        steps = entry.get("judge_steps") or []
+        if any(s.get("exit_reason") == "llm_corrective" for s in steps):
+            out.add(q)
+        elif entry.get("judge_actions"):
+            out.add(q)
+    return out
+
+
+def estimate_llm_calls(
+    entry: dict,
+    *,
+    skip_llm_judge: bool = False,
+    max_corrective_steps: int = 1,
+) -> dict[str, int]:
+    """Fallback when judge_llm_calls is absent (pre-trace MMORE builds)."""
+    answer_calls = 1
+    if skip_llm_judge:
+        return {
+            "answer_llm_calls": answer_calls,
+            "judge_llm_calls_est": 0,
+            "total_llm_calls_est": answer_calls,
+        }
+
+    actions = entry.get("judge_actions") or []
+    rm = entry.get("retrieval_metrics") or {}
+    thresholds_met = rm.get("thresholds_met")
+
+    if not actions and thresholds_met == 1.0:
+        judge_calls = 0
+    else:
+        # One judge call per loop entry that reaches the LLM + final PROCEED evaluation.
+        judge_calls = len(actions) + 1
+
+    return {
+        "answer_llm_calls": answer_calls,
+        "judge_llm_calls_est": judge_calls,
+        "total_llm_calls_est": answer_calls + judge_calls,
+    }
+
+
+def is_judge_study_run(run_name: str) -> bool:
+    return (
+        run_name.startswith("run_steps_")
+        or run_name.startswith("run_force_")
+        or run_name == "run_judge_scout"
+    )

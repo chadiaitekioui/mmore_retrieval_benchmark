@@ -1,4 +1,6 @@
-# RAG + judge — deploy on cluster: python -m mmore rag -c config/rag/run_C_api.yaml
+# run_C — isolated RE_RETRIEVE corrective (legacy protocol, NOT examples/rag/config_judge.yaml)
+# Deploy: python -m mmore rag -c config/rag/run_C_api.yaml
+# allow_* restricts judge to RE_RETRIEVE only; max_corrective_steps=1; initial k=5 → default re-retrieve k=10
 rag:
   llm:
     llm_name: meta-llama/Llama-3.1-8B-Instruct
@@ -68,10 +70,9 @@ rag:
       min_max_rerank_score: 1.0
       min_mean_rerank_score: 0.5
       min_num_docs: 3
-      min_context_relevance: 7.0
     max_corrective_steps: 1
-    allow_add_questions: true
-    allow_add_context: true
+    allow_add_questions: false
+    allow_add_context: false
     allow_re_retrieve: true
     max_web_results: 5
   system_prompt: "Use the following context to answer the questions.\n\nContext:\n{context}"

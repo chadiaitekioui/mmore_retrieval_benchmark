@@ -70,9 +70,8 @@ config_for_run() {
   case "$1" in
     run_C) echo "${ROOT}/config/rag/run_C_api.yaml" ;;
     run_C_ctrl) echo "${ROOT}/config/rag/run_C_ctrl_api.yaml" ;;
-    run_C_suff_*)
-      tag="${1#run_C_suff_}"
-      echo "${ROOT}/config/rag/calib/run_C_suff_${tag}.yaml"
+    run_steps_*|run_judge_scout|run_force_*)
+      echo "${ROOT}/config/rag/study/${1}.yaml"
       ;;
     *) echo "${ROOT}/config/retrieve/${1}.yaml" ;;
   esac
@@ -100,7 +99,7 @@ start_mmore() {
   stop_mmore
 
   case "$run" in
-    run_C|run_C_ctrl|run_C_suff_*)
+    run_C|run_C_ctrl|run_steps_*|run_judge_scout|run_force_*)
       require_hf_token_for_rag "$run"
       echo "=== Start MMORE RAG (${run}) on :${RAG_PORT} ==="
       python -m mmore rag --config-file "$cfg" &

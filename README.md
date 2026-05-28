@@ -20,6 +20,8 @@ bash install.sh # or INSTALL_HF_ANNOTATE=1 bash install.sh if you are using HF m
 source env.benchmark
 ```
 
+If you already had mmore installed, please update the branch version.
+
 What your workspace folder should look like:
 
 ```text
@@ -40,6 +42,11 @@ bash jobs/setup_medxpertqa.sh                            # MedRAG clinical corpu
 ```
 
 `CLEAN_DB=1` (default) recreates `proc_demo.db` on each corpus build.
+
+```bash
+export DB_URI=/scratch/users/aitekiou/dbs/medrag_v2.db
+export COLLECTION_NAME=my_db_v2   # if you want to keep my_db a seperate folder
+```
 
 ---
 
@@ -110,21 +117,23 @@ Rerank isolation @10: `run_F → run_G` (same k, +BGE rerank).
 
 ---
 
-## Judge calibration
+## Judge study
 
-The default judge uses `min_context_relevance: 7.0` (sufficiency **0.7** on the 1–10 score scale). A **99.5% corrective rate** usually means the LLM almost always triggers a corrective action.
+**Corrective steps impact** For `max_corrective_steps ∈ {0, 1, 2, 3}`, measure final response quality (faithfulness, answer relevance) against total LLM call cost, and track how many queries exhaust the step budget without reaching `PROCEED` — the goal is to find the step count where marginal quality gain no longer justifies the added cost.
 
-### Threshold sweep (corrective rate vs Hit@10)
+**Corrective action comparison** On queries where the judge triggers a corrective action, compare the final response quality across `RE_RETRIEVE`, `ADD_QUESTIONS`, and `ADD_CONTEXT`, segmented by query type (factual, multi-hop, ambiguous) — the goal is to identify which action delivers the most improvement depending on the failure mode.
 
 ```bash
-# Offline curve from existing run_C (simulated threshold-only corrective rate):
-bash jobs/judge_calibration.sh
-
-# Curve (4× run_C collect with sufficiency 0.3 / 0.5 / 0.7 / 0.9):
-export HF_TOKEN=hf_...
-bash jobs/collect_judge_calibration.sh
-bash jobs/evaluate_judge_calibration.sh
-bash jobs/judge_calibration.sh
+bash jobs/collect_judge_study.sh
+bash jobs/evaluate_judge_study.sh
+bash jobs/judge_study.sh
 ```
 
-Outputs: `results/judge_calibration/calibration.json`, `calibration_curve.png`, `per_question_judge_gt.json`.
+Outputs: `results/judge_study/judge_study.json`, `pareto_quality_vs_cost.png`, `axis3_action_comparison.png`.
+
+Metrics per study run: `results/<run>/metrics.json` (Hit@10), `rag_quality.json` (MCQ accuracy, `judge_llm_calls` from API, non-convergence via `hit_max_corrective_steps`).
+
+**Required MMORE changes** (API trace export): [`docs/MMORE_JUDGE_STUDY_CHANGES.md`](docs/MMORE_JUDGE_STUDY_CHANGES.md) — implemented in MMORE ≥ trace export; benchmark reads `judge_reason`, `judge_llm_calls`, `judge_steps`, `hit_max_corrective_steps`.
+
+---
+

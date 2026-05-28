@@ -10,3 +10,5 @@ For the current benchmark, use only:
 | Runs C, C_ctrl (judge) | `../rag/run_C_api.yaml`, `run_C_ctrl_api.yaml` → `mmore rag` |
 
 Legacy YAML is kept as reference for judge hyperparameters (full prompts in `run_C.yaml`).
+
+Judge study (axes 2 & 3): see [`../study/README.md`](../study/README.md).

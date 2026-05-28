@@ -17,7 +17,7 @@ RUN="${1:?Usage: $0 RUN BASE_URL   e.g. run_B http://localhost:8001}"
 BASE_URL="${2:?Missing BASE_URL}"
 
 case "$RUN" in
-  run_C|run_C_ctrl|run_C_suff_*) API_TYPE="rag" ;;
+  run_C|run_C_ctrl|run_steps_*|run_judge_scout|run_force_*) API_TYPE="rag" ;;
   run_A|run_B|run_D|run_E|run_F|run_G) API_TYPE="retriever" ;;
   *)
     echo "Unknown run: $RUN" >&2
@@ -27,7 +27,7 @@ esac
 
 case "$RUN" in
   run_F|run_G) K=10 ;;
-  run_C_suff_*) K=5 ;;  # initial retrieve k; Hit@10 computed at eval
+  run_steps_*|run_judge_scout|run_force_*) K=5 ;;
   *) K=5 ;;
 esac
 
@@ -54,5 +54,12 @@ python scripts/collect_from_api.py \
   --record-query-key "$RECORD_QUERY_KEY" \
   --raw-out "$RAW" \
   "${COLLECT_EXTRA[@]}"
+
+python scripts/write_run_manifest.py --run "$RUN"
+
+# Optional: tag coerced_decision from MMORE logs (set MMORE_LOG_FILE)
+if [[ -n "${MMORE_LOG_FILE:-}" && -f "${MMORE_LOG_FILE}" ]]; then
+  python scripts/infer_coerced_decisions.py --chunks "$OUT" --log "${MMORE_LOG_FILE}"
+fi
 
 echo "✓ $OUT"

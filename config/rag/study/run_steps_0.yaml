@@ -1,5 +1,4 @@
-# run_C_ctrl — same retrieve/thresholds as run_C, no judge LLM and no corrective actions
-# Deploy: python -m mmore rag -c config/rag/run_C_ctrl_api.yaml
+# Axis 2 — max_corrective_steps=0
 rag:
   llm:
     llm_name: meta-llama/Llama-3.1-8B-Instruct
@@ -18,11 +17,21 @@ rag:
       llm_name: meta-llama/Llama-3.1-8B-Instruct
       max_new_tokens: 512
       temperature: 0.01
-    skip_llm_judge: true
+    skip_llm_judge: false
     system_prompt: |
-      Unused (skip_llm_judge). Frozen for manifest parity with run_C.
+      You are a retrieval quality judge for a medical RAG system (English only).
+      In one step: (1) score context relevance 1-10, (2) read Threshold check (PASS/FAIL),
+      (3) pick ONE corrective action.
+      Respond with a single valid JSON object only (no markdown fences, no commentary).
+      decision must be exactly one of: PROCEED, ADD_QUESTIONS, ADD_CONTEXT, RE_RETRIEVE.
+      Never choose an action not listed under Allowed actions.
     user_prompt: |
       Question: {query}
+      Retrieval metrics: {metrics}
+      Threshold check: {metrics_status}
+      Configured thresholds: {thresholds}
+      Allowed actions: {allowed_actions}
+      Retrieved chunks: {chunks}
       Return JSON only.
     metric_thresholds:
       min_mean_similarity: 0.5
@@ -30,9 +39,9 @@ rag:
       min_mean_rerank_score: 0.5
       min_num_docs: 3
     max_corrective_steps: 0
-    allow_add_questions: false
-    allow_add_context: false
-    allow_re_retrieve: false
+    allow_add_questions: true
+    allow_add_context: true
+    allow_re_retrieve: true
     max_web_results: 5
   system_prompt: "Use the following context to answer the questions.\n\nContext:\n{context}"
 mode: api
