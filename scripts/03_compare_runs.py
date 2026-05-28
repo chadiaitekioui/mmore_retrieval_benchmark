@@ -230,23 +230,12 @@ def main():
         rerank_k10_comparisons.append(res_g)
     print_mcnemar_block("McNemar — rerank effect at Hit@10", rerank_k10_comparisons)
 
-    # HyDE @ k=5: run_B (raw query) vs run_H (HyDE passage as query)
-    hyde_comparisons: list[dict] = []
-    hits_b = load_per_question_hits(results_dir, "run_B")
-    hits_h = load_per_question_hits(results_dir, "run_H")
-    if hits_b and hits_h and len(hits_b) == len(hits_h):
-        res_h = mcnemar_test(hits_b, hits_h)
-        res_h["comparison"] = "run_B → run_H (HyDE @5)"
-        hyde_comparisons.append(res_h)
-    print_mcnemar_block("McNemar — HyDE effect at Hit@5", hyde_comparisons)
-
     summary = {
         "runs": runs,
         "mcnemar_baseline": baseline_comparisons,
         "mcnemar_judge": judge_comparisons,
         "mcnemar_judge_k10": judge_comparisons_k10,
         "mcnemar_rerank_k10": rerank_k10_comparisons,
-        "mcnemar_hyde_k5": hyde_comparisons,
         "judge_at_k10": {
             "runs": [
                 {
@@ -272,7 +261,6 @@ def main():
             "Primary judge test: run_B vs run_C (McNemar).",
             "Hit@10 judge test: run_F → run_C and run_C_ctrl → run_C (McNemar at k=10).",
             "Rerank @10: run_F (bi-encoder k=10) vs run_G (+ BGE rerank k=10).",
-            "HyDE @5: run_B (raw vignette) vs run_H (hypothetical passage as retrieve query).",
             "run_F evaluated at k=10; run_B remains evaluated at k=5 (only 5 chunks collected), so Hit@10 comparisons with run_B are not apples-to-apples.",
             "Hit@10 computed additionally for judge runs (run_C, run_C_ctrl).",
             "Chunks collected via HTTP API or 04_convert (no run_rag.py changes).",

@@ -48,15 +48,16 @@ bash jobs/setup_medxpertqa.sh                            # MedRAG clinical corpu
 **Requires:** [Hugging Face token](#prerequisites-hugging-face-gated-llama)
 
 ```bash
-export OPENAI_API_KEY=sk-...   # or HF model
-bash jobs/prepare_hyde_queries.sh
+export OPENAI_API_KEY=sk-...
+# Or
+export HF_TOKEN=hf_xxxxxxxx
 ```
 
 ```bash
 bash jobs/collect_all.sh
 ```
 
-`collect_all.sh`: for each run A → H: start MMORE, 200 HTTP queries, `results/<run>/chunks.json`
+`collect_all.sh`: for each run A → G: start MMORE, 200 HTTP queries, `results/<run>/chunks.json`
 
 ---
 
@@ -101,13 +102,11 @@ Writes `results/<run>/metrics.json` and `results/summary.json`
 | `run_E`      | yes      | no              | 1.0    | 5                 | `mmore retrieve` |
 | `run_F`      | no       | no              | 0.5    | 10                | `mmore retrieve` |
 | `run_G`      | yes      | no              | 0.5    | 10                | `mmore retrieve` |
-| `run_H`      | yes      | no (HyDE query) | 0.5    | 5                 | `mmore retrieve` |
 
 
 Primary judge comparison (legacy): `run_B → run_C` at Hit@5.  
 Judge widening: `run_F → run_C` and `run_C_ctrl → run_C` at Hit@10.  
-Rerank isolation @10: `run_F → run_G` (same k, +BGE rerank).  
-HyDE @5: `run_B → run_H` (hypothetical passage embedded instead of raw vignette; `jobs/prepare_hyde_queries.sh`).
+Rerank isolation @10: `run_F → run_G` (same k, +BGE rerank).
 
 ---
 

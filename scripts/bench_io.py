@@ -19,7 +19,6 @@ RUN_K: dict[str, int] = {
     "run_E": 5,
     "run_F": 10,
     "run_G": 10,
-    "run_H": 5,
 }
 
 GT_VERSION = 2

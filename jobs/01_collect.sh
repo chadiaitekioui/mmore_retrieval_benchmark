@@ -7,7 +7,7 @@
 #   bash jobs/01_collect.sh run_B http://localhost:8001
 #   bash jobs/01_collect.sh run_C http://localhost:8000
 #
-# Runs: run_A … run_F run_G run_H
+# Runs: run_A … run_F run_G
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -18,7 +18,7 @@ BASE_URL="${2:?Missing BASE_URL}"
 
 case "$RUN" in
   run_C|run_C_ctrl|run_C_suff_*) API_TYPE="rag" ;;
-  run_A|run_B|run_D|run_E|run_F|run_G|run_H) API_TYPE="retriever" ;;
+  run_A|run_B|run_D|run_E|run_F|run_G) API_TYPE="retriever" ;;
   *)
     echo "Unknown run: $RUN" >&2
     exit 1
@@ -34,21 +34,7 @@ esac
 QUERY_KEY="input"
 RECORD_QUERY_KEY="input"
 COLLECT_EXTRA=()
-
-case "$RUN" in
-  run_H)
-    QUERIES="${QUERIES:-data/medxpertqa_200_hyde_mmore.jsonl}"
-    QUERY_KEY="hyde_input"
-    if [[ ! -f "$QUERIES" ]]; then
-      echo "Missing HyDE queries: $QUERIES" >&2
-      echo "  bash jobs/prepare_hyde_queries.sh" >&2
-      exit 1
-    fi
-    ;;
-  *)
-    QUERIES="${QUERIES:-data/medxpertqa_200_mmore.jsonl}"
-    ;;
-esac
+QUERIES="${QUERIES:-data/medxpertqa_200_mmore.jsonl}"
 
 OUT="results/${RUN}/chunks.json"
 RAW="results/${RUN}/raw_api.json"

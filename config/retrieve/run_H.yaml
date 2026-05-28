@@ -1,9 +1,0 @@
-# Same retrieval stack as run_B; queries are HyDE-expanded (see jobs/prepare_hyde_queries.sh).
-db:
-  uri: ${DB_URI}
-  name: ${DB_NAME}
-collection_name: ${COLLECTION_NAME}
-hybrid_search_weight: 0.5
-k: 5
-use_web: false
-reranker_model_name: BAAI/bge-reranker-base

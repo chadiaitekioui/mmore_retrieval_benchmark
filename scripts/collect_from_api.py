@@ -104,7 +104,7 @@ def main():
     parser.add_argument(
         "--query-key",
         default="input",
-        help="JSONL field sent to the API (e.g. hyde_input for run_H)",
+        help="JSONL field sent to the API (default: input)",
     )
     parser.add_argument(
         "--record-query-key",

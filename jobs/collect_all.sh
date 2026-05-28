@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Collect all 9 runs in one terminal: start MMORE per config, HTTP collect, stop server.
+# Collect benchmark runs in one terminal: start MMORE per config, HTTP collect, stop server.
 #
 # Prerequisites:
 #   source env.benchmark
@@ -15,8 +15,7 @@
 #   MMORE_RETRIEVER_PORT=8001   retriever API (runs A,B,D,E,F)
 #   MMORE_RAG_PORT=8000         RAG + judge (runs C, C_ctrl)
 #   MMORE_STARTUP_WAIT=600      seconds max wait per server start
-#   RUNS="run_A run_B ..."      subset (default: all 9)
-#   For run_H: bash jobs/prepare_hyde_queries.sh first
+#   RUNS="run_A run_B ..."      explicit subset override
 
 set -euo pipefail
 
@@ -35,7 +34,7 @@ fi
 RETRIEVER_PORT="${MMORE_RETRIEVER_PORT:-8001}"
 RAG_PORT="${MMORE_RAG_PORT:-8000}"
 STARTUP_WAIT="${MMORE_STARTUP_WAIT:-600}"
-ALL_RUNS=(run_A run_B run_C run_C_ctrl run_D run_E run_F run_G run_H)
+ALL_RUNS=(run_A run_B run_C run_C_ctrl run_D run_E run_F run_G)
 
 if [[ -n "${RUNS:-}" ]]; then
   # shellcheck disable=SC2206
