@@ -133,7 +133,7 @@ Outputs: `results/judge_study/judge_study.json`, `pareto_quality_vs_cost.png`, `
 
 Metrics per study run: `results/<run>/metrics.json` (Hit@10), `rag_quality.json` (MCQ accuracy, `judge_llm_calls` from API, non-convergence via `hit_max_corrective_steps`).
 
-**Required MMORE changes** (API trace export): [`docs/MMORE_JUDGE_STUDY_CHANGES.md`](docs/MMORE_JUDGE_STUDY_CHANGES.md) — implemented in MMORE ≥ trace export; benchmark reads `judge_reason`, `judge_llm_calls`, `judge_steps`, `hit_max_corrective_steps`.
+**Required MMORE changes** (API trace export): `[docs/MMORE_JUDGE_STUDY_CHANGES.md](docs/MMORE_JUDGE_STUDY_CHANGES.md)` — implemented in MMORE ≥ trace export; benchmark reads `judge_reason`, `judge_llm_calls`, `judge_steps`, `hit_max_corrective_steps`.
 
 ---
 

@@ -44,8 +44,10 @@ Example shape (replace values for the current question):
 Action guidelines (priority order when retrieval is weak):
 1. PROCEED: All metrics PASS and chunks support a grounded medical answer.
 2. RE_RETRIEVE: Default corrective action — reformulate retrieve_params.input and/or raise k (e.g. 8-10).
-3. ADD_QUESTIONS: Multi-part clinical question; provide 1-3 specific extra_questions.
-4. ADD_CONTEXT: Last resort if the indexed corpus cannot contain the answer.
+   Use when min_num_docs, similarity, rerank, or context_relevance thresholds FAIL.
+3. ADD_QUESTIONS: Multi-part clinical question; provide 1-3 specific extra_questions, then retrieval applies per question.
+4. ADD_CONTEXT: Last resort only if the indexed corpus cannot contain the answer (novel drug, no indexed source).
+   Do not use for standard clinical facts likely in the corpus.
 Never choose an action not listed under Allowed actions.
 """
 
@@ -123,7 +125,14 @@ def build_config(
 
 def dump_yaml(cfg: dict, path: Path) -> None:
     header = cfg.pop("_header", "")
-    text = (header + "\n" if header else "") + yaml.dump(cfg, sort_keys=False, allow_unicode=True)
+
+    def _literal_str(dumper: yaml.Dumper, data: str) -> yaml.nodes.Node:
+        style = "|" if "\n" in data else None
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
+
+    yaml.add_representer(str, _literal_str)
+    body = yaml.dump(cfg, sort_keys=False, allow_unicode=True, default_flow_style=False)
+    text = (header + "\n" if header else "") + body
     path.write_text(text, encoding="utf-8")
 
 

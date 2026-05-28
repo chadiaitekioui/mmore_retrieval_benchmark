@@ -93,7 +93,7 @@ pip install -r corpus/requirements.txt
 MMORE_DEVICE="${MMORE_DEVICE:-cpu}"   # or cu126 for GPU torch
 pip install -e "${MMORE_ROOT}[process,${MMORE_DEVICE}]"   # process + postprocess
 pip install -e "${MMORE_ROOT}[index,${MMORE_DEVICE}]"
-pip install -e "${MMORE_ROOT}[rag,api]"
+pip install -e "${MMORE_ROOT}[rag,api,websearch]"   # websearch = ddgs for judge ADD_CONTEXT
 
 echo ""
 echo "Installation complete."

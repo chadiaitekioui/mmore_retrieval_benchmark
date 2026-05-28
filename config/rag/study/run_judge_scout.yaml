@@ -1,4 +1,4 @@
-# Axis 3 — scout run (free judge, max_steps=1)
+# Axis 3 — free judge (all actions); used to build trigger subset T
 rag:
   llm:
     llm_name: meta-llama/Llama-3.1-8B-Instruct
@@ -22,16 +22,46 @@ rag:
       You are a retrieval quality judge for a medical RAG system (English only).
       In one step: (1) score context relevance 1-10, (2) read Threshold check (PASS/FAIL),
       (3) pick ONE corrective action.
+
       Respond with a single valid JSON object only (no markdown fences, no commentary).
+      Use real numbers and booleans — never copy placeholder syntax like <1-10> or <true|false>.
+      Keep "reason" to one short sentence (max 120 chars). Do not paste chunk text into JSON strings.
       decision must be exactly one of: PROCEED, ADD_QUESTIONS, ADD_CONTEXT, RE_RETRIEVE.
+
+      Example shape (replace values for the current question):
+      {
+        "context_relevance_score": 8,
+        "sufficient": true,
+        "decision": "PROCEED",
+        "reason": "Chunks support a grounded answer.",
+        "extra_questions": [],
+        "web_query": null,
+        "retrieve_params": {"input": null, "k": 10}
+      }
+
+      Action guidelines (priority order when retrieval is weak):
+      1. PROCEED: All metrics PASS and chunks support a grounded medical answer.
+      2. RE_RETRIEVE: Default corrective action — reformulate retrieve_params.input and/or raise k (e.g. 8-10).
+         Use when min_num_docs, similarity, rerank, or context_relevance thresholds FAIL.
+      3. ADD_QUESTIONS: Multi-part clinical question; provide 1-3 specific extra_questions, then retrieval applies per question.
+      4. ADD_CONTEXT: Last resort only if the indexed corpus cannot contain the answer (novel drug, no indexed source).
+         Do not use for standard clinical facts likely in the corpus.
       Never choose an action not listed under Allowed actions.
     user_prompt: |
       Question: {query}
-      Retrieval metrics: {metrics}
-      Threshold check: {metrics_status}
+
+      Retrieval metrics (numeric; context_relevance_score is yours to set in JSON):
+      {metrics}
+
+      Threshold check (compare each line to Configured thresholds):
+      {metrics_status}
+
       Configured thresholds: {thresholds}
       Allowed actions: {allowed_actions}
-      Retrieved chunks: {chunks}
+
+      Retrieved chunks:
+      {chunks}
+
       Return JSON only.
     metric_thresholds:
       min_mean_similarity: 0.5
@@ -43,7 +73,11 @@ rag:
     allow_add_context: true
     allow_re_retrieve: true
     max_web_results: 5
-  system_prompt: "Use the following context to answer the questions.\n\nContext:\n{context}"
+  system_prompt: |-
+    Use the following context to answer the questions.
+
+    Context:
+    {context}
 mode: api
 mode_args:
   endpoint: /rag
