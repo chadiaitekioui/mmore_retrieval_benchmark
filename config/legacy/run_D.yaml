@@ -15,7 +15,6 @@ rag:
     llm:
       llm_name: meta-llama/Llama-3.1-8B-Instruct
       max_new_tokens: 512
-    skip_llm_judge: false
     system_prompt: |
       You are a retrieval quality judge for a medical RAG system (English only).
         In one step: (1) score context relevance 1-10, (2) read Threshold check (PASS/FAIL),

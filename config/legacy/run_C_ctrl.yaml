@@ -16,7 +16,7 @@ rag:
     llm:
       llm_name: meta-llama/Llama-3.1-8B-Instruct
       max_new_tokens: 512
-    skip_llm_judge: true
+    force_corrective_action: PROCEED
     system_prompt: |
       You are a retrieval quality judge for a medical RAG system (English only).
     user_prompt: |

@@ -17,7 +17,6 @@ rag:
       llm_name: meta-llama/Llama-3.1-8B-Instruct
       max_new_tokens: 512
       temperature: 0.01
-    skip_llm_judge: false
     system_prompt: |
       You are a retrieval quality judge for a medical RAG system (English only).
       You are called when index thresholds have failed at least once, or to re-evaluate after a corrective action.

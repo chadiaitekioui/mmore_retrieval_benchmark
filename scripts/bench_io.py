@@ -359,16 +359,19 @@ def hit_max_corrective_steps(entry: dict) -> bool:
     return entry.get("judge_reason") == "max_corrective_steps"
 
 
-def llm_calls_from_entry(entry: dict, *, skip_llm_judge: bool = False) -> dict[str, Any]:
+def _judge_llm_skipped(entry: dict) -> bool:
+    """True when the judge loop did not invoke the judge LLM."""
+    reason = entry.get("judge_reason")
+    if reason in ("force_corrective_action", "metrics_above_thresholds", "metrics_after_correction"):
+        return True
+    actions = entry.get("judge_actions") or []
+    rm = entry.get("retrieval_metrics") or {}
+    return not actions and rm.get("thresholds_met") == 1.0
+
+
+def llm_calls_from_entry(entry: dict) -> dict[str, Any]:
     """LLM call counts — prefer MMORE API fields, fallback to estimate."""
     answer_calls = 1
-    if skip_llm_judge or entry.get("judge_reason") == "skip_llm_judge":
-        return {
-            "answer_llm_calls": answer_calls,
-            "judge_llm_calls": 0,
-            "total_llm_calls": answer_calls,
-            "from_api": True,
-        }
 
     if entry.get("judge_llm_calls") is not None:
         judge_calls = int(entry["judge_llm_calls"])
@@ -380,7 +383,15 @@ def llm_calls_from_entry(entry: dict, *, skip_llm_judge: bool = False) -> dict[s
             "from_api": True,
         }
 
-    est = estimate_llm_calls(entry, skip_llm_judge=skip_llm_judge)
+    if _judge_llm_skipped(entry):
+        return {
+            "answer_llm_calls": answer_calls,
+            "judge_llm_calls": 0,
+            "total_llm_calls": answer_calls,
+            "from_api": False,
+        }
+
+    est = estimate_llm_calls(entry)
     return {
         "answer_llm_calls": est["answer_llm_calls"],
         "judge_llm_calls": est["judge_llm_calls_est"],
@@ -407,12 +418,11 @@ def trigger_queries_from_entries(entries: list[dict]) -> set[str]:
 def estimate_llm_calls(
     entry: dict,
     *,
-    skip_llm_judge: bool = False,
     max_corrective_steps: int = 1,
 ) -> dict[str, int]:
     """Fallback when judge_llm_calls is absent (pre-trace MMORE builds)."""
     answer_calls = 1
-    if skip_llm_judge:
+    if _judge_llm_skipped(entry):
         return {
             "answer_llm_calls": answer_calls,
             "judge_llm_calls_est": 0,

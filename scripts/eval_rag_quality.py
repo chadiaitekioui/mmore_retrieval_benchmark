@@ -37,7 +37,6 @@ def main() -> None:
     parser.add_argument("--out", required=True)
     parser.add_argument("--run-name", default="")
     parser.add_argument("--max-corrective-steps", type=int, default=None)
-    parser.add_argument("--skip-llm-judge", action="store_true")
     args = parser.parse_args()
 
     run_name = args.run_name or Path(args.chunks).parent.name
@@ -66,7 +65,7 @@ def main() -> None:
         pred_idx = parse_mcq_choice(answer_text)
         correct = pred_idx == gold_idx if pred_idx is not None else False
 
-        costs = llm_calls_from_entry(entry, skip_llm_judge=args.skip_llm_judge)
+        costs = llm_calls_from_entry(entry)
         jm = extract_judge_metrics(entry)
         at_max = hit_max_corrective_steps(entry)
         if at_max:

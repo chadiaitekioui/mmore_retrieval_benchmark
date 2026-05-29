@@ -78,8 +78,12 @@ def _extract_judge_block_raw(config_path: Path) -> dict[str, Any] | None:
         m = re.search(rf"^\s*{key}:\s*(\d+)\s*$", text, re.MULTILINE)
         return int(m.group(1)) if m else default
 
+    def _str(key: str) -> str | None:
+        m = re.search(rf'^\s*{key}:\s*"?([A-Z_]+)"?\s*$', text, re.MULTILINE)
+        return m.group(1) if m else None
+
     out: dict[str, Any] = {
-        "skip_llm_judge": _bool("skip_llm_judge"),
+        "force_corrective_action": _str("force_corrective_action"),
         "max_corrective_steps": _int("max_corrective_steps"),
         "allow_re_retrieve": _bool("allow_re_retrieve"),
         "allow_add_questions": _bool("allow_add_questions"),
@@ -106,7 +110,7 @@ def _extract_judge_prompts(config_path: Path) -> dict[str, Any] | None:
         if judge:
             out: dict[str, Any] = {}
             for key in (
-                "skip_llm_judge",
+                "force_corrective_action",
                 "max_corrective_steps",
                 "allow_re_retrieve",
                 "allow_add_questions",
@@ -177,7 +181,7 @@ def main() -> None:
         "protocol_notes": {
             "do_not_use": "mmore/examples/rag/config_judge.yaml for benchmark comparison",
             "run_C": "allow_re_retrieve only; max_corrective_steps=1; legacy frozen prompts",
-            "run_C_ctrl": "skip_llm_judge + max_corrective_steps=0",
+            "run_C_ctrl": "force_corrective_action: PROCEED + max_corrective_steps=0",
             "retrieve_runs": "no judge block; mmore retrieve only",
         },
     }

@@ -18,9 +18,9 @@ rag:
       llm_name: meta-llama/Llama-3.1-8B-Instruct
       max_new_tokens: 512
       temperature: 0.01
-    skip_llm_judge: true
+    force_corrective_action: PROCEED
     system_prompt: |
-      Unused (skip_llm_judge). Frozen for manifest parity with run_C.
+      Unused (force_corrective_action: PROCEED). Frozen for manifest parity with run_C.
     user_prompt: |
       Question: {query}
       Return JSON only.
