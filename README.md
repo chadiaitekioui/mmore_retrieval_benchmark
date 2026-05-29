@@ -119,7 +119,7 @@ Rerank isolation @10: `run_F → run_G` (same k, +BGE rerank).
 
 ## Judge study
 
-**Corrective steps impact** For `max_corrective_steps ∈ {0, 1, 2, 3}`, measure final response quality (faithfulness, answer relevance) against total LLM call cost, and track how many queries exhaust the step budget without reaching `PROCEED` — the goal is to find the step count where marginal quality gain no longer justifies the added cost.
+**Corrective steps impact** For `max_corrective_steps ∈ {0, 1, 2}`, measure final response quality (faithfulness, answer relevance) against total LLM call cost, and track how many queries exhaust the step budget without reaching `PROCEED` — the goal is to find the step count where marginal quality gain no longer justifies the added cost.
 
 **Corrective action comparison** On queries where the judge triggers a corrective action, compare the final response quality across `RE_RETRIEVE`, `ADD_QUESTIONS`, and `ADD_CONTEXT`, segmented by query type (factual, multi-hop, ambiguous) — the goal is to identify which action delivers the most improvement depending on the failure mode.
 

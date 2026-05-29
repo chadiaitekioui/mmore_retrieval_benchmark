@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from bench_io import load_retriever_json, trigger_queries_from_entries  # noqa: E402
 
-STUDY_RUNS_AXIS2 = tuple(f"run_steps_{n}" for n in range(4))
+STUDY_RUNS_AXIS2 = tuple(f"run_steps_{n}" for n in range(3))
 STUDY_RUNS_AXIS3 = ("run_force_rr", "run_force_aq", "run_force_ac")
 
 try:

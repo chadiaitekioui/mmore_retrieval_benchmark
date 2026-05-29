@@ -10,7 +10,7 @@
 #   bash jobs/collect_judge_study.sh
 #
 # Outputs:
-#   results/run_steps_{0,1,2,3}/chunks.json
+#   results/run_steps_{0,1,2}/chunks.json
 #   results/run_judge_scout/chunks.json
 #   results/run_force_{rr,aq,ac}/chunks.json
 
@@ -30,7 +30,7 @@ fi
 RAG_PORT="${MMORE_RAG_PORT:-8000}"
 STARTUP_WAIT="${MMORE_STARTUP_WAIT:-600}"
 STUDY_RUNS=(
-  run_steps_0 run_steps_1 run_steps_2 run_steps_3
+  run_steps_0 run_steps_1 run_steps_2
   run_judge_scout
   run_force_rr run_force_aq run_force_ac
 )

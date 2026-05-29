@@ -11,7 +11,7 @@ cd "$ROOT"
 pip install -r requirements.txt -q 2>/dev/null || true
 
 STUDY_RUNS=(
-  run_steps_0 run_steps_1 run_steps_2 run_steps_3
+  run_steps_0 run_steps_1 run_steps_2
   run_judge_scout
   run_force_rr run_force_aq run_force_ac
 )

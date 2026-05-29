@@ -188,13 +188,6 @@ def main() -> None:
             ),
         ),
         (
-            "run_steps_3",
-            build_config(
-                header="# Axis 2 — max_corrective_steps=3",
-                max_corrective_steps=3,
-            ),
-        ),
-        (
             "run_judge_scout",
             build_config(
                 header="# Axis 3 — free judge (all actions); used to build trigger subset T",
